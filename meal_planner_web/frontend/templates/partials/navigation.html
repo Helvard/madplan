@@ -8,7 +8,7 @@
             <h1 class="text-2xl font-bold">🍽️ Meal Planner</h1>
             
             <!-- Main Navigation -->
-            <nav class="flex items-center gap-6">
+            <nav class="flex items-center gap-5">
                 <!-- Plan -->
                 <a href="/" class="nav-link {% if current_page == 'plan' %}font-bold underline{% else %}hover:underline{% endif %} relative">
                     Plan
@@ -16,12 +16,12 @@
                         !
                     </span>
                 </a>
-                
+
                 <!-- Offers -->
                 <a href="/offers" class="nav-link {% if current_page == 'offers' %}font-bold underline{% else %}hover:underline{% endif %}">
                     Offers
                 </a>
-                
+
                 <!-- Shopping List -->
                 <a href="/shopping-list" class="nav-link {% if current_page == 'shopping-list' %}font-bold underline{% else %}hover:underline{% endif %} relative">
                     Shopping List
@@ -29,16 +29,30 @@
                         0
                     </span>
                 </a>
-                
+
                 <!-- History -->
                 <a href="/history" class="nav-link {% if current_page == 'history' %}font-bold underline{% else %}hover:underline{% endif %}">
                     History
                 </a>
-                
+
                 <!-- Preferences -->
                 <a href="/preferences" class="nav-link {% if current_page == 'preferences' %}font-bold underline{% else %}hover:underline{% endif %}">
                     Preferences
                 </a>
+
+                <!-- User / Household -->
+                {% if user %}
+                <div class="flex items-center gap-3 ml-2 pl-4 border-l border-green-500">
+                    <a href="/household" class="text-sm opacity-80 hover:opacity-100" title="Household settings">
+                        👤 {{ user.email.split('@')[0] }}
+                    </a>
+                    <form method="post" action="/logout" class="inline">
+                        <button type="submit" class="text-sm opacity-70 hover:opacity-100 hover:underline">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
             </nav>
         </div>
     </div>

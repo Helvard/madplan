@@ -5,7 +5,7 @@ FastAPI backend with htmx frontend
 """
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Optional
 from html import escape
 import markdown
+import httpx
 
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -28,6 +29,7 @@ from reportlab.lib.units import mm
 from database import Database
 from claude_client import ClaudeClient
 from scraper import load_offers_from_db, format_offers_for_claude
+from auth import get_current_user, login_redirect
 
 app = FastAPI(title="Meal Planner")
 
@@ -53,19 +55,206 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 db = Database()
 claude = ClaudeClient()
 
+# Supabase config for auth API calls
+_SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+_SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
 # Session storage (in-memory for now, could move to Redis later)
 chat_sessions = {}
+
+
+# ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
+
+def _supabase_auth_headers() -> dict:
+    return {"apikey": _SUPABASE_KEY, "Content-Type": "application/json"}
+
+
+def _require_auth(request: Request):
+    """Return (user, household_id) or raise redirect."""
+    user = get_current_user(request)
+    if not user:
+        return None, None
+    return user, user.get("household_id")
+
+
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_post(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{_SUPABASE_URL}/auth/v1/token?grant_type=password",
+            headers=_supabase_auth_headers(),
+            json={"email": email, "password": password},
+        )
+    if resp.status_code != 200:
+        error = resp.json().get("error_description") or resp.json().get("msg") or "Login failed"
+        return templates.TemplateResponse("login.html", {"request": request, "error": error})
+
+    data = resp.json()
+    access_token = data["access_token"]
+    user_id = data["user"]["id"]
+    user_email = data["user"]["email"]
+
+    # Get or create user_profile + household_id
+    profile = db.get_user_profile(user_id)
+    if not profile:
+        profile = db.create_user_profile(user_id, user_email)
+
+    household_id = profile.get("household_id")
+
+    request.session["access_token"] = access_token
+    request.session["user"] = {"id": user_id, "email": user_email, "household_id": household_id}
+    request.session["household_id"] = household_id
+
+    # If no household yet, send to setup page
+    if not household_id:
+        return RedirectResponse(url="/household", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse("signup.html", {"request": request, "error": None})
+
+
+@app.post("/signup", response_class=HTMLResponse)
+async def signup_post(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{_SUPABASE_URL}/auth/v1/signup",
+            headers=_supabase_auth_headers(),
+            json={"email": email, "password": password},
+        )
+    body = resp.json()
+    if resp.status_code not in (200, 201) or body.get("error"):
+        error = body.get("error_description") or body.get("msg") or body.get("error") or "Signup failed"
+        return templates.TemplateResponse("signup.html", {"request": request, "error": error})
+
+    # Auto-login after signup
+    async with httpx.AsyncClient() as client:
+        login_resp = await client.post(
+            f"{_SUPABASE_URL}/auth/v1/token?grant_type=password",
+            headers=_supabase_auth_headers(),
+            json={"email": email, "password": password},
+        )
+    if login_resp.status_code != 200:
+        # Signup worked but email confirmation may be required
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": None,
+            "message": "Account created! Please log in.",
+        })
+
+    data = login_resp.json()
+    user_id = data["user"]["id"]
+    profile = db.get_user_profile(user_id)
+    if not profile:
+        db.create_user_profile(user_id, email)
+
+    request.session["access_token"] = data["access_token"]
+    request.session["user"] = {"id": user_id, "email": email, "household_id": None}
+    request.session["household_id"] = None
+    return RedirectResponse(url="/household", status_code=303)
+
+
+@app.post("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
+
+
+@app.get("/household", response_class=HTMLResponse)
+async def household_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return login_redirect()
+    household_id = user.get("household_id")
+    household = db.get_household(household_id) if household_id else None
+    members = db.get_household_members(household_id) if household_id else []
+    return templates.TemplateResponse("household.html", {
+        "request": request,
+        "user": user,
+        "household": household,
+        "members": members,
+        "error": None,
+        "message": None,
+    })
+
+
+@app.post("/household/create", response_class=HTMLResponse)
+async def household_create(request: Request, name: str = Form(...)):
+    user = get_current_user(request)
+    if not user:
+        return login_redirect()
+    household = db.create_household(name.strip(), user["id"])
+    household_id = household["id"]
+    request.session["household_id"] = household_id
+    # Update session user dict
+    u = request.session.get("user", {})
+    u["household_id"] = household_id
+    request.session["user"] = u
+    return RedirectResponse(url="/household", status_code=303)
+
+
+@app.post("/household/join", response_class=HTMLResponse)
+async def household_join(request: Request, invite_code: str = Form(...)):
+    user = get_current_user(request)
+    if not user:
+        return login_redirect()
+    household = db.join_household(invite_code, user["id"])
+    if not household:
+        existing_hh = db.get_household(user.get("household_id")) if user.get("household_id") else None
+        members = db.get_household_members(user.get("household_id")) if user.get("household_id") else []
+        return templates.TemplateResponse("household.html", {
+            "request": request,
+            "user": user,
+            "household": existing_hh,
+            "members": members,
+            "error": "Invalid invite code. Please check and try again.",
+            "message": None,
+        })
+    household_id = household["id"]
+    request.session["household_id"] = household_id
+    u = request.session.get("user", {})
+    u["household_id"] = household_id
+    request.session["user"] = u
+    return RedirectResponse(url="/household", status_code=303)
 
 
 @app.get("/shopping-list/items", response_class=HTMLResponse)
 async def get_shopping_list_items_html(request: Request):
     """Get shopping list items as HTML partial."""
     db = Database()
-    shopping_list = db.get_active_shopping_list()
-    
+    _, household_id = _require_auth(request)
+    shopping_list = db.get_active_shopping_list(household_id=household_id)
+
     if not shopping_list:
         return "<div class='text-center py-8 text-gray-500'>No shopping list found</div>"
-    
+
     items = db.get_shopping_list_items(shopping_list['id'])
     
     # Group by category
@@ -102,7 +291,8 @@ async def get_shopping_list_items_html(request: Request):
 async def get_shopping_list_stats(request: Request):
     """Get shopping list statistics as HTML partial."""
     db = Database()
-    shopping_list = db.get_active_shopping_list()
+    _, household_id = _require_auth(request)
+    shopping_list = db.get_active_shopping_list(household_id=household_id)
     
     if not shopping_list:
         return ""
@@ -165,30 +355,24 @@ async def remove_shopping_list_item_endpoint(item_id: int):
 
 
 @app.post("/shopping-list/clear-checked")
-async def clear_checked_items():
+async def clear_checked_items(request: Request):
     """Clear all checked items from shopping list."""
-    from fastapi.responses import RedirectResponse
-    
+    _, household_id = _require_auth(request)
     db = Database()
-    shopping_list = db.get_active_shopping_list()
-    
+    shopping_list = db.get_active_shopping_list(household_id=household_id)
     if shopping_list:
         db.clear_shopping_list(shopping_list['id'], checked_only=True)
-    
     return RedirectResponse(url="/shopping-list", status_code=303)
 
 
 @app.post("/shopping-list/clear-all")
-async def clear_all_items():
+async def clear_all_items(request: Request):
     """Clear all items from shopping list."""
-    from fastapi.responses import RedirectResponse
-    
+    _, household_id = _require_auth(request)
     db = Database()
-    shopping_list = db.get_active_shopping_list()
-    
+    shopping_list = db.get_active_shopping_list(household_id=household_id)
     if shopping_list:
         db.clear_shopping_list(shopping_list['id'], checked_only=False)
-    
     return RedirectResponse(url="/shopping-list", status_code=303)
 
 
@@ -394,15 +578,18 @@ async def generate_plan(request: Request, session_id: str = Form(...)):
     # Load offers
     offers = load_offers_from_db()
     offers_text = format_offers_for_claude(offers)
-    
-    # Get selected offers from request session (NEW)
+
+    # Get household_id for this session
+    _, household_id = _require_auth(request)
+    session["household_id"] = household_id
+
+    # Get selected offers from request session
     selected_offers = request.session.get('selected_offers', [])
     if selected_offers:
         prefs['selected_offers'] = selected_offers
         # Clear them after using so they don't persist forever
         request.session.pop('selected_offers', None)
-        # Build prompt
-    prompt = build_claude_prompt(offers_text, prefs)
+    prompt = build_claude_prompt(offers_text, prefs, household_id=household_id)
 
     # Call Claude
     try:
@@ -438,9 +625,13 @@ async def health():
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Render the main chat interface."""
+    user = get_current_user(request)
+    if not user:
+        return login_redirect()
     selected_offers = request.session.get('selected_offers', [])
     return templates.TemplateResponse("index.html", {
         "request": request,
+        "user": user,
         "selected_offers": selected_offers
     })
 
@@ -489,8 +680,9 @@ async def accept_plan(request: Request, session_id: str = Form(...)):
             })
         
         # Save to database
+        household_id = session.get("household_id")
         if meals:
-            db.save_meal_plan(plan_date, meals)
+            db.save_meal_plan(plan_date, meals, household_id=household_id)
             session["state"] = "complete"
             
             bot_response = f"✅ Perfect! I've saved your {len(meals)}-day meal plan.\n\nAfter you've cooked these meals, come back and rate them so I can make even better suggestions next time!\n\nWould you like to start planning another week?"
@@ -559,11 +751,11 @@ async def refine_plan(request: Request, session_id: str = Form(...), feedback: s
 @app.get("/rate-meals")
 async def rate_meals_page(request: Request):
     """Show page to rate unrated meals."""
-    # Get unrated meals from database
-    unrated = db.get_unrated_meals()
-    
-    return templates.TemplateResponse("rate_meals_simple.html", {
+    user, household_id = _require_auth(request)
+    unrated = db.get_unrated_meals(household_id=household_id)
+    return templates.TemplateResponse("rate_meals.html", {
         "request": request,
+        "user": user,
         "unrated_meals": unrated
     })
 
@@ -627,21 +819,23 @@ async def submit_ratings(request: Request):
 @app.get("/offers")
 async def offers_page(request: Request):
     """Show offers browsing page."""
+    user = get_current_user(request)
     try:
         offers = load_offers_from_db()
-        
+
         # Calculate stats
         total_offers = len(offers)
         avg_savings = sum(o.get('savings_percent', 0) for o in offers) / total_offers if total_offers > 0 else 0
-        
+
         # Group by department
         departments = {}
         for offer in offers:
             dept = offer.get('department', 'Other')
             departments[dept] = departments.get(dept, 0) + 1
-        
+
         return templates.TemplateResponse("offers.html", {
             "request": request,
+            "user": user,
             "offers": offers,
             "total_offers": total_offers,
             "avg_savings": round(avg_savings, 1),
@@ -650,6 +844,7 @@ async def offers_page(request: Request):
     except FileNotFoundError:
         return templates.TemplateResponse("offers.html", {
             "request": request,
+            "user": user,
             "offers": [],
             "total_offers": 0,
             "avg_savings": 0,
@@ -809,7 +1004,8 @@ async def submit_offer_selections(request: Request):
     
     # Get offer details from database
     db = Database()
-    
+    _, household_id = _require_auth(request)
+
     # Process meal plan selections (store in session for use in chat)
     meal_plan_offer_names = []
     if meal_plan_selections:
@@ -840,9 +1036,9 @@ async def submit_offer_selections(request: Request):
     shopping_list_count = 0
     if shopping_list_selections:
         # Get or create active shopping list
-        active_list = db.get_active_shopping_list()
+        active_list = db.get_active_shopping_list(household_id=household_id)
         if not active_list:
-            list_id = db.create_shopping_list(f"Shopping List {datetime.now().strftime('%Y-%m-%d')}")
+            list_id = db.create_shopping_list(f"Shopping List {datetime.now().strftime('%Y-%m-%d')}", household_id=household_id)
         else:
             list_id = active_list['id']
         
@@ -921,10 +1117,11 @@ async def submit_offer_selections(request: Request):
 
 
 @app.get("/shopping-list/badge", response_class=HTMLResponse)
-async def get_shopping_list_badge():
+async def get_shopping_list_badge(request: Request):
     """Get the current shopping list item count for the badge."""
     db = Database()
-    active_list = db.get_active_shopping_list()
+    _, household_id = _require_auth(request)
+    active_list = db.get_active_shopping_list(household_id=household_id)
     
     if not active_list:
         return "0"
@@ -978,10 +1175,11 @@ def categorize_item(item_name: str, department: Optional[str] = None) -> str:
 @app.get("/preferences")
 async def preferences_page(request: Request):
     """Show preferences management page."""
-    preferences = db.load_preferences()
-    
+    user, household_id = _require_auth(request)
+    preferences = db.load_preferences(household_id=household_id)
     return templates.TemplateResponse("preferences.html", {
         "request": request,
+        "user": user,
         "preferences": preferences
     })
 
@@ -989,7 +1187,8 @@ async def preferences_page(request: Request):
 @app.post("/preferences/reset")
 async def reset_preferences(request: Request):
     """Reset preferences to defaults."""
-    db.reset_preferences_to_defaults()
+    _, household_id = _require_auth(request)
+    db.reset_preferences_to_defaults(household_id=household_id)
     return HTMLResponse("OK")
 
 
@@ -1049,16 +1248,17 @@ async def pref_chat_message(
         """)
     
     session = pref_chat_sessions[session_id]
-    current_prefs = db.load_preferences()
-    
+    _, household_id = _require_auth(request)
+    current_prefs = db.load_preferences(household_id=household_id)
+
     # Check if user wants to save
     save_keywords = ['save', 'apply', 'done', 'finish']
     should_save = any(keyword == message.lower().strip() for keyword in save_keywords)
-    
+
     try:
         if should_save and session.get('pending_changes'):
             # Apply pending changes
-            db.save_preferences(session['pending_changes'])
+            db.save_preferences(session['pending_changes'], household_id=household_id)
             bot_response = "✅ **Preferences saved!**\n\nYour changes have been applied. Refresh the page to see the updates."
         else:
             # Use Claude to understand the preference change
@@ -1154,22 +1354,23 @@ Be conversational and helpful!"""
 @app.get("/history")
 async def view_history(request: Request):
     """View meal history and ratings."""
-    history = db.get_meal_history(limit=20)
-
+    user, household_id = _require_auth(request)
+    history = db.get_meal_history(limit=20, household_id=household_id)
     return templates.TemplateResponse("history.html", {
         "request": request,
+        "user": user,
         "history": history
     })
 
 
-def build_claude_prompt(offers_text: str, preferences: dict) -> str:
+def build_claude_prompt(offers_text: str, preferences: dict, household_id: int = None) -> str:
     """Build the prompt for Claude with structured shopping list output."""
-    
+
     # Load overall preferences from preferences manager
-    overall_prefs_text = db.format_for_prompt()
-    
+    overall_prefs_text = db.format_for_prompt(household_id=household_id)
+
     # Load meal history for context
-    meal_history_text = db.get_meal_history_for_context(weeks_back=4)
+    meal_history_text = db.get_meal_history_for_context(weeks_back=4, household_id=household_id)
     
     prompt_parts = [
         "You are a meal planning assistant. Create a weekly meal plan based on current supermarket offers.",
@@ -1280,12 +1481,13 @@ Replace your current shopping_list_page function with this one
 async def shopping_list_page(request: Request):
     """Display the shopping list page."""
     db = Database()
-    
+    _, household_id = _require_auth(request)
+
     # Get or create active shopping list
-    shopping_list = db.get_active_shopping_list()
+    shopping_list = db.get_active_shopping_list(household_id=household_id)
     if not shopping_list:
-        list_id = db.create_shopping_list(f"Shopping List {datetime.now().strftime('%Y-%m-%d')}")
-        shopping_list = db.get_active_shopping_list()
+        db.create_shopping_list(f"Shopping List {datetime.now().strftime('%Y-%m-%d')}", household_id=household_id)
+        shopping_list = db.get_active_shopping_list(household_id=household_id)
     
     # Get items
     items = db.get_shopping_list_items(shopping_list['id'])
@@ -1298,8 +1500,10 @@ async def shopping_list_page(request: Request):
     checked = stats['checked_items']
     progress_percent = (checked / total * 100) if total > 0 else 0
     
+    user = get_current_user(request)
     return templates.TemplateResponse("shopping_list.html", {
         "request": request,
+        "user": user,
         "shopping_list": shopping_list,
         "items": items,
         "stats": stats,
@@ -1310,7 +1514,8 @@ async def shopping_list_page(request: Request):
 async def get_shopping_list_count(request: Request):
     """Get count of items in active shopping list (for navigation badge)."""
     try:
-        active_list = db.get_active_shopping_list()
+        _, household_id = _require_auth(request)
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return {"count": 0}
@@ -1333,7 +1538,8 @@ async def add_shopping_list_item_endpoint(
 ):
     """Add a manual item to the shopping list."""
     try:
-        active_list = db.get_active_shopping_list()
+        _, household_id = _require_auth(request)
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return HTMLResponse("Error: No active shopping list", status_code=400)
@@ -1366,10 +1572,11 @@ async def add_shopping_list_item_endpoint(
 async def toggle_shopping_list_item_endpoint(request: Request, item_id: int):
     """Toggle checked status of an item."""
     try:
+        _, household_id = _require_auth(request)
         new_status = db.toggle_shopping_list_item(item_id)
-        
+
         # Return updated stats
-        active_list = db.get_active_shopping_list()
+        active_list = db.get_active_shopping_list(household_id=household_id)
         stats = db.get_shopping_list_stats(active_list['id'])
         
         return templates.TemplateResponse("partials/shopping_list_stats.html", {
@@ -1386,10 +1593,11 @@ async def toggle_shopping_list_item_endpoint(request: Request, item_id: int):
 async def remove_shopping_list_item_endpoint(request: Request, item_id: int):
     """Remove an item from the shopping list."""
     try:
+        _, household_id = _require_auth(request)
         db.remove_shopping_list_item(item_id)
-        
+
         # Return updated list
-        active_list = db.get_active_shopping_list()
+        active_list = db.get_active_shopping_list(household_id=household_id)
         items_by_category = db.get_shopping_list_by_category(active_list['id'])
         stats = db.get_shopping_list_stats(active_list['id'])
         
@@ -1411,7 +1619,8 @@ async def clear_shopping_list_endpoint(
 ):
     """Clear shopping list items."""
     try:
-        active_list = db.get_active_shopping_list()
+        _, household_id = _require_auth(request)
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return HTMLResponse("Error: No active shopping list", status_code=400)
@@ -1441,16 +1650,17 @@ async def clear_shopping_list_endpoint(
 async def add_from_offers_endpoint(request: Request):
     """Add selected offers to shopping list."""
     try:
+        _, household_id = _require_auth(request)
         form_data = await request.form()
         selected_offers_json = form_data.get('selected_offers', '[]')
-        
+
         import json
         selected_offers = json.loads(selected_offers_json)
-        
+
         if not selected_offers:
             return HTMLResponse("No offers selected", status_code=400)
-        
-        active_list = db.get_active_shopping_list()
+
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return HTMLResponse("Error: No active shopping list", status_code=400)
@@ -1494,7 +1704,8 @@ async def add_from_meal_plan_endpoint(
 ):
     """Parse meal plan and add shopping list items."""
     try:
-        active_list = db.get_active_shopping_list()
+        _, household_id = _require_auth(request)
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return HTMLResponse("Error: No active shopping list", status_code=400)
@@ -1538,8 +1749,9 @@ async def export_shopping_list_pdf(request: Request):
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import mm
         from datetime import datetime
-        
-        active_list = db.get_active_shopping_list()
+
+        _, household_id = _require_auth(request)
+        active_list = db.get_active_shopping_list(household_id=household_id)
         
         if not active_list:
             return HTMLResponse("Error: No active shopping list", status_code=400)

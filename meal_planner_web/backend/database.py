@@ -57,7 +57,7 @@ class Database:
 
     # ========== MEAL HISTORY ==========
 
-    def save_meal_plan(self, plan_date: str, meals: List[Dict]):
+    def save_meal_plan(self, plan_date: str, meals: List[Dict], household_id: int = None):
         """Save a complete meal plan to history."""
         rows = [
             {
@@ -66,22 +66,24 @@ class Database:
                 "meal_name": meal.get("name"),
                 "ingredients": meal.get("ingredients", []),
                 "cost_estimate": meal.get("cost"),
+                **({"household_id": household_id} if household_id else {}),
             }
             for i, meal in enumerate(meals)
         ]
         self.db.table("meal_history").insert(rows).execute()
 
-    def get_meal_history(self, limit: int = 30) -> List[Dict]:
+    def get_meal_history(self, limit: int = 30, household_id: int = None) -> List[Dict]:
         """Get recent meal history."""
-        res = (
+        q = (
             self.db.table("meal_history")
-            .select("plan_date, day_number, meal_name, ingredients, cost_estimate, rating, comments, would_repeat")
+            .select("id, plan_date, day_number, meal_name, ingredients, cost_estimate, rating, comments, would_repeat")
             .order("plan_date", desc=True)
             .order("day_number")
             .limit(limit)
-            .execute()
         )
-        return res.data or []
+        if household_id:
+            q = q.eq("household_id", household_id)
+        return q.execute().data or []
 
     def rate_meal(self, meal_id: int, rating: int, comments: str = None, would_repeat: bool = True):
         """Rate a meal from history."""
@@ -92,51 +94,52 @@ class Database:
             "date_rated": _now(),
         }).eq("id", meal_id).execute()
 
-    def get_meal_history_for_context(self, weeks_back: int = 4) -> str:
+    def get_meal_history_for_context(self, weeks_back: int = 4, household_id: int = None) -> str:
         """Get meal history formatted for Claude's context."""
         from datetime import date, timedelta
         cutoff_date = (date.today() - timedelta(weeks=weeks_back)).isoformat()
 
+        def _filter(q):
+            if household_id:
+                q = q.eq("household_id", household_id)
+            return q
+
         # Recent meals (to avoid repetition)
-        recent_res = (
+        recent_res = _filter(
             self.db.table("meal_history")
             .select("meal_name")
             .gte("plan_date", cutoff_date)
-            .execute()
-        )
+        ).execute()
         recent_meal_names = list({r["meal_name"] for r in (recent_res.data or [])})
 
         # Top-rated meals
-        top_res = (
+        top_res = _filter(
             self.db.table("meal_history")
             .select("meal_name, rating, would_repeat, plan_date, comments")
             .gte("rating", 4)
             .eq("would_repeat", True)
             .order("rating", desc=True)
             .limit(10)
-            .execute()
-        )
+        ).execute()
         top_rated = top_res.data or []
 
         # Low-rated meals to avoid
-        low_res = (
+        low_res = _filter(
             self.db.table("meal_history")
             .select("meal_name, rating, comments")
             .lte("rating", 2)
-            .execute()
-        )
+        ).execute()
         low_rated = low_res.data or []
 
         # Recent rated meals for feedback context
-        rated_res = (
+        rated_res = _filter(
             self.db.table("meal_history")
             .select("meal_name, plan_date, rating, comments, would_repeat")
-            .gte("plan_date", f"(select ({cutoff})::date)")
+            .gte("plan_date", cutoff_date)
             .not_.is_("rating", "null")
             .order("plan_date", desc=True)
             .limit(10)
-            .execute()
-        )
+        ).execute()
         rated_meals = rated_res.data or []
 
         # Format for Claude
@@ -184,50 +187,82 @@ class Database:
 
         return "\n".join(parts)
 
-    def get_unrated_meals(self, limit: int = 50) -> List[Dict]:
+    def get_unrated_meals(self, limit: int = 50, household_id: int = None) -> List[Dict]:
         """Get meals that haven't been rated yet."""
-        res = (
+        q = (
             self.db.table("meal_history")
             .select("id, plan_date, day_number, meal_name, ingredients, cost_estimate")
             .is_("rating", "null")
             .order("plan_date", desc=True)
             .order("day_number")
             .limit(limit)
-            .execute()
         )
-        return res.data or []
+        if household_id:
+            q = q.eq("household_id", household_id)
+        return q.execute().data or []
 
     # ========== PREFERENCES ==========
 
-    def load_preferences(self) -> Dict:
-        """Load preferences from Supabase (single JSONB row)."""
-        res = (
-            self.db.table("preferences")
-            .select("data")
-            .eq("user_id", "default")
-            .single()
-            .execute()
-        )
+    def load_preferences(self, household_id: int = None) -> Dict:
+        """Load preferences from Supabase (single JSONB row per household)."""
+        if household_id:
+            res = (
+                self.db.table("preferences")
+                .select("data")
+                .eq("household_id", household_id)
+                .limit(1)
+                .execute()
+            )
+        else:
+            res = (
+                self.db.table("preferences")
+                .select("data")
+                .eq("user_id", "default")
+                .limit(1)
+                .execute()
+            )
         if res.data:
-            return res.data["data"]
+            return res.data[0]["data"]
         return DEFAULT_PREFERENCES.copy()
 
-    def save_preferences(self, preferences: Dict) -> bool:
+    def save_preferences(self, preferences: Dict, household_id: int = None) -> bool:
         """Save preferences to Supabase."""
-        self.db.table("preferences").upsert({
-            "user_id": "default",
-            "data": preferences,
-            "updated_at": _now(),
-        }).execute()
+        if household_id:
+            # Check if row exists
+            existing = (
+                self.db.table("preferences")
+                .select("household_id")
+                .eq("household_id", household_id)
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                self.db.table("preferences").update({
+                    "data": preferences,
+                    "updated_at": _now(),
+                }).eq("household_id", household_id).execute()
+            else:
+                self.db.table("preferences").insert({
+                    "user_id": f"household_{household_id}",
+                    "household_id": household_id,
+                    "data": preferences,
+                    "updated_at": _now(),
+                }).execute()
+        else:
+            self.db.table("preferences").upsert({
+                "user_id": "default",
+                "data": preferences,
+                "updated_at": _now(),
+            }).execute()
         return True
 
-    def reset_preferences_to_defaults(self) -> bool:
+    def reset_preferences_to_defaults(self, household_id: int = None) -> bool:
         """Reset preferences to default values."""
-        return self.save_preferences(DEFAULT_PREFERENCES.copy())
+        return self.save_preferences(DEFAULT_PREFERENCES.copy(), household_id=household_id)
 
-    def format_for_prompt(self) -> str:
+    def format_for_prompt(self, household_id: int = None) -> str:
         """Format preferences as text for Claude prompt."""
-        prefs = self.load_preferences()
+        prefs = self.load_preferences(household_id=household_id)
 
         lines = [
             "# Family Context",
@@ -265,24 +300,24 @@ class Database:
 
     # ========== SHOPPING LISTS ==========
 
-    def get_active_shopping_list(self) -> Optional[Dict]:
+    def get_active_shopping_list(self, household_id: int = None) -> Optional[Dict]:
         """Get the currently active shopping list."""
-        res = (
+        q = (
             self.db.table("shopping_lists")
             .select("id, name, created_at, status")
             .eq("is_active", True)
-            .limit(1)
-            .execute()
         )
+        if household_id:
+            q = q.eq("household_id", household_id)
+        res = q.limit(1).execute()
         return res.data[0] if res.data else None
 
-    def create_shopping_list(self, name: str) -> int:
+    def create_shopping_list(self, name: str, household_id: int = None) -> int:
         """Create a new shopping list and return its ID."""
-        res = (
-            self.db.table("shopping_lists")
-            .insert({"name": name, "is_active": True, "status": "active"})
-            .execute()
-        )
+        row = {"name": name, "is_active": True, "status": "active"}
+        if household_id:
+            row["household_id"] = household_id
+        res = self.db.table("shopping_lists").insert(row).execute()
         return res.data[0]["id"]
 
     def get_shopping_list_items(self, list_id: int, include_checked: bool = True) -> List[Dict]:
@@ -434,6 +469,74 @@ class Database:
             .execute()
         )
         return res.data if res.data else None
+
+    # ========== HOUSEHOLDS ==========
+
+    def get_user_profile(self, user_id: str) -> Optional[Dict]:
+        """Return the user_profile row (includes household_id) or None."""
+        res = (
+            self.db.table("user_profiles")
+            .select("id, email, household_id")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def create_user_profile(self, user_id: str, email: str) -> Dict:
+        """Insert a new user_profile row (household_id is NULL until they join/create one)."""
+        res = (
+            self.db.table("user_profiles")
+            .insert({"id": user_id, "email": email})
+            .execute()
+        )
+        return res.data[0]
+
+    def create_household(self, name: str, user_id: str) -> Dict:
+        """Create a new household and link the creating user to it."""
+        # Create household
+        res = self.db.table("households").insert({"name": name}).execute()
+        household = res.data[0]
+        household_id = household["id"]
+        # Link user to household
+        self.db.table("user_profiles").update({"household_id": household_id}).eq("id", user_id).execute()
+        return household
+
+    def join_household(self, invite_code: str, user_id: str) -> Optional[Dict]:
+        """Look up household by invite_code, link user, return household or None if not found."""
+        res = (
+            self.db.table("households")
+            .select("id, name, invite_code")
+            .eq("invite_code", invite_code.strip().lower())
+            .limit(1)
+            .execute()
+        )
+        if not res.data:
+            return None
+        household = res.data[0]
+        self.db.table("user_profiles").update({"household_id": household["id"]}).eq("id", user_id).execute()
+        return household
+
+    def get_household(self, household_id: int) -> Optional[Dict]:
+        """Return household row or None."""
+        res = (
+            self.db.table("households")
+            .select("id, name, invite_code, created_at")
+            .eq("id", household_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def get_household_members(self, household_id: int) -> List[Dict]:
+        """Return list of user_profile rows for a household."""
+        res = (
+            self.db.table("user_profiles")
+            .select("id, email, created_at")
+            .eq("household_id", household_id)
+            .execute()
+        )
+        return res.data or []
 
     # ========== HELPERS ==========
 

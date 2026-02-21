@@ -25,6 +25,9 @@ reportlab==4.4.5
 # Markdown rendering
 Markdown==3.10
 
+# Auth
+PyJWT==2.10.1
+
 # Config / parsing
 python-dotenv==1.2.1
 PyYAML==6.0.3
