@@ -1,0 +1,91 @@
+<!-- Unified Navigation Component - partials/navigation.html -->
+<!-- Include this in all page templates -->
+
+<header class="bg-green-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-4">
+        <div class="flex items-center justify-between">
+            <!-- Logo/Title -->
+            <h1 class="text-2xl font-bold">🍽️ Meal Planner</h1>
+            
+            <!-- Main Navigation -->
+            <nav class="flex items-center gap-6">
+                <!-- Plan -->
+                <a href="/" class="nav-link {% if current_page == 'plan' %}font-bold underline{% else %}hover:underline{% endif %} relative">
+                    Plan
+                    <span id="nav-badge-plan" class="hidden absolute -top-2 -right-3 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        !
+                    </span>
+                </a>
+                
+                <!-- Offers -->
+                <a href="/offers" class="nav-link {% if current_page == 'offers' %}font-bold underline{% else %}hover:underline{% endif %}">
+                    Offers
+                </a>
+                
+                <!-- Shopping List -->
+                <a href="/shopping-list" class="nav-link {% if current_page == 'shopping-list' %}font-bold underline{% else %}hover:underline{% endif %} relative">
+                    Shopping List
+                    <span id="nav-badge-shopping" class="hidden absolute -top-2 -right-3 bg-orange-400 text-orange-900 text-xs font-bold rounded-full px-2 py-0.5">
+                        0
+                    </span>
+                </a>
+                
+                <!-- History -->
+                <a href="/history" class="nav-link {% if current_page == 'history' %}font-bold underline{% else %}hover:underline{% endif %}">
+                    History
+                </a>
+                
+                <!-- Preferences -->
+                <a href="/preferences" class="nav-link {% if current_page == 'preferences' %}font-bold underline{% else %}hover:underline{% endif %}">
+                    Preferences
+                </a>
+            </nav>
+        </div>
+    </div>
+</header>
+
+<!-- State Management Script -->
+<script>
+    // Global state management
+    const AppState = {
+        // Get shopping list count from backend
+        async getShoppingListCount() {
+            try {
+                const response = await fetch('/shopping-list/count');
+                const data = await response.json();
+                return data.count || 0;
+            } catch (e) {
+                return 0;
+            }
+        },
+        
+        // Update all navigation badges
+        async updateBadges() {
+            // Update shopping list badge
+            const shoppingCount = await this.getShoppingListCount();
+            const shoppingBadge = document.getElementById('nav-badge-shopping');
+            
+            if (shoppingCount > 0) {
+                shoppingBadge.textContent = shoppingCount;
+                shoppingBadge.classList.remove('hidden');
+            } else {
+                shoppingBadge.classList.add('hidden');
+            }
+        }
+    };
+    
+    // Update badges on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        AppState.updateBadges();
+    });
+    
+    // Listen for shopping list updates
+    document.body.addEventListener('shopping-list-updated', () => {
+        AppState.updateBadges();
+    });
+    
+    // Update periodically (every 30 seconds)
+    setInterval(() => {
+        AppState.updateBadges();
+    }, 30000);
+</script>

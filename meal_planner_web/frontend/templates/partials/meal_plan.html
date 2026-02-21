@@ -1,0 +1,97 @@
+<!-- Updated Meal plan display partial - partials/meal_plan.html -->
+<!-- Replace existing meal_plan.html with this version -->
+
+<div class="flex items-start gap-3">
+    <div class="flex-shrink-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">
+        🤖
+    </div>
+    <div class="flex-1 bg-green-50 border border-green-200 rounded-lg p-6 max-w-3xl">
+        <div class="prose prose-sm max-w-none">
+            <!-- Render meal plan as markdown -->
+            {{ meal_plan | safe }}
+        </div>
+        
+        <div class="mt-6 pt-4 border-t border-green-200">
+            <!-- Action Buttons -->
+            <div class="flex gap-3 mb-3">
+                <button 
+                    onclick="showShoppingListPrompt('{{ session_id }}')"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
+                >
+                    ✅ Accept Plan
+                </button>
+                <button 
+                    onclick="document.getElementById('feedback-input-{{ session_id }}').classList.remove('hidden'); this.style.display='none';"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                    🔄 Request Changes
+                </button>
+            </div>
+            
+            <!-- Shopping List Prompt (Hidden initially) -->
+            <div id="shopping-list-prompt-{{ session_id }}" class="hidden mb-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="font-semibold mb-3">📝 Add ingredients to shopping list?</p>
+                <div class="flex gap-3">
+                    <button 
+                        hx-post="/shopping-list/add-from-meal-plan"
+                        hx-vals='{"session_id": "{{ session_id }}", "meal_plan": {{ meal_plan_raw|tojson }}}'
+                        hx-target="#chat-messages"
+                        hx-swap="beforeend"
+                        onclick="acceptPlanFinal('{{ session_id }}')"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+                    >
+                        Yes, Add to Shopping List
+                    </button>
+                    <button 
+                        hx-post="/chat/accept-plan"
+                        hx-vals='{"session_id": "{{ session_id }}"}'
+                        hx-target="#chat-messages"
+                        hx-swap="beforeend"
+                        onclick="acceptPlanFinal('{{ session_id }}')"
+                        class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition"
+                    >
+                        No, Just Save Plan
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Hidden feedback input -->
+            <div id="feedback-input-{{ session_id }}" class="hidden">
+                <form 
+                    hx-post="/chat/refine-plan"
+                    hx-target="#chat-messages"
+                    hx-swap="beforeend"
+                    class="flex gap-2"
+                >
+                    <input type="hidden" name="session_id" value="{{ session_id }}">
+                    <input 
+                        type="text" 
+                        name="feedback"
+                        placeholder="What would you like to change? (e.g., 'replace Day 3 with something easier')"
+                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+                        required
+                    >
+                    <button 
+                        type="submit"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showShoppingListPrompt(sessionId) {
+    // Hide accept button, show shopping list prompt
+    event.target.style.display = 'none';
+    document.getElementById('shopping-list-prompt-' + sessionId).classList.remove('hidden');
+}
+
+function acceptPlanFinal(sessionId) {
+    // Hide the prompt after selection
+    document.getElementById('shopping-list-prompt-' + sessionId).classList.add('hidden');
+}
+</script>

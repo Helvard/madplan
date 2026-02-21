@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Meals - Meal Planner</title>
+    
+    <!-- htmx -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-green-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">🍽️ Meal Planner</h1>
+                    <nav class="space-x-4">
+                        <a href="/" class="hover:underline">Plan</a>
+                        <a href="/history" class="hover:underline">History</a>
+                        <a href="/preferences" class="hover:underline">Preferences</a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 container mx-auto px-4 py-8 max-w-4xl">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">⭐ Rate Your Meals</h2>
+                <p class="text-gray-600 mb-8">Help improve future meal plans by rating what you've cooked!</p>
+                
+                {% if unrated_meals %}
+                    <form hx-post="/rate-meals/submit" hx-target="#result-message">
+                        <div class="space-y-8">
+                            {% for meal in unrated_meals %}
+                            <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                                <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                                    {{ meal.meal_name }}
+                                </h3>
+                                <p class="text-sm text-gray-500 mb-4">
+                                    Day {{ meal.day_number }} • {{ meal.plan_date }}
+                                </p>
+                                
+                                <input type="hidden" name="meal_id_{{ loop.index }}" value="{{ meal.id }}">
+                                
+                                <!-- Star Rating -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Rating *
+                                    </label>
+                                    <div class="flex gap-1 star-rating">
+                                        {% for star in range(1, 6) %}
+                                        <label class="cursor-pointer star-label">
+                                            <input type="radio" name="rating_{{ loop.index0 + 1 }}" value="{{ star }}" class="hidden star-input" required>
+                                            <svg class="w-10 h-10 star-icon text-gray-300 hover:text-yellow-400 transition" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                            </svg>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Comments -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Comments (optional)
+                                    </label>
+                                    <textarea 
+                                        name="comments_{{ loop.index }}"
+                                        rows="2"
+                                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        placeholder="What did you think? Any adjustments?"
+                                    ></textarea>
+                                </div>
+                                
+                                <!-- Would Repeat -->
+                                <div>
+                                    <label class="flex items-center cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            name="would_repeat_{{ loop.index }}"
+                                            value="true"
+                                            class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                            checked
+                                        >
+                                        <span class="ml-2 text-sm text-gray-700">I'd make this again</span>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            
+                            <input type="hidden" name="meal_count" value="{{ unrated_meals|length }}">
+                        </div>
+                        
+                        <div class="mt-8">
+                            <button 
+                                type="submit"
+                                class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                            >
+                                Submit Ratings
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="result-message" class="mt-4"></div>
+                    
+                {% else %}
+                    <div class="text-center py-12">
+                        <p class="text-gray-500 text-lg mb-4">No unrated meals.</p>
+                        <p class="text-gray-400 mb-6">All your meals have been rated!</p>
+                        <a href="/history" class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
+                            View History
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white text-center py-4">
+            <p class="text-sm">Meal Planner • Powered by Claude AI</p>
+        </footer>
+    </div>
+    
+    <style>
+        /* Hide radio buttons but keep them functional */
+        .hidden {
+            display: none;
+        }
+        
+        /* Star rating styles */
+        .star-input:checked ~ .star-icon,
+        .star-input:checked + .star-icon {
+            color: #FBBF24 !important;
+        }
+        
+        /* Highlight all stars up to the checked one */
+        .star-label:has(.star-input:checked) .star-icon,
+        .star-label:has(.star-input:checked) ~ .star-label .star-icon {
+            color: #D1D5DB;
+        }
+        
+        .star-label .star-input:checked + .star-icon {
+            color: #FBBF24 !important;
+        }
+    </style>
+    
+    <script>
+        // Star rating functionality
+        document.addEventListener('DOMContentLoader', function() {
+            initStarRatings();
+        });
+        
+        // Initialize immediately since htmx might load content dynamically
+        setTimeout(initStarRatings, 100);
+        
+        function initStarRatings() {
+            const starContainers = document.querySelectorAll('.star-rating');
+            
+            starContainers.forEach(container => {
+                const labels = container.querySelectorAll('.star-label');
+                
+                labels.forEach((label, index) => {
+                    label.addEventListener('click', function() {
+                        const input = this.querySelector('input');
+                        const allStars = container.querySelectorAll('.star-icon');
+                        
+                        // Update all stars in this rating group
+                        allStars.forEach((star, starIndex) => {
+                            if (starIndex <= index) {
+                                star.classList.remove('text-gray-300');
+                                star.classList.add('text-yellow-400');
+                            } else {
+                                star.classList.remove('text-yellow-400');
+                                star.classList.add('text-gray-300');
+                            }
+                        });
+                    });
+                    
+                    // Hover effect
+                    label.addEventListener('mouseenter', function() {
+                        const allStars = container.querySelectorAll('.star-icon');
+                        allStars.forEach((star, starIndex) => {
+                            if (starIndex <= index) {
+                                star.classList.add('text-yellow-400');
+                            }
+                        });
+                    });
+                });
+                
+                // Reset hover effect on mouse leave
+                container.addEventListener('mouseleave', function() {
+                    const checkedInput = container.querySelector('input:checked');
+                    const allStars = container.querySelectorAll('.star-icon');
+                    
+                    if (checkedInput) {
+                        const checkedIndex = Array.from(container.querySelectorAll('input')).indexOf(checkedInput);
+                        allStars.forEach((star, starIndex) => {
+                            if (starIndex <= checkedIndex) {
+                                star.classList.add('text-yellow-400');
+                                star.classList.remove('text-gray-300');
+                            } else {
+                                star.classList.remove('text-yellow-400');
+                                star.classList.add('text-gray-300');
+                            }
+                        });
+                    } else {
+                        allStars.forEach(star => {
+                            star.classList.remove('text-yellow-400');
+                            star.classList.add('text-gray-300');
+                        });
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

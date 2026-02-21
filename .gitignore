@@ -1,0 +1,33 @@
+# Secrets
+.env
+
+# Claude Code
+.claude/
+
+# Data
+data/
+*.db
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# Old migration / backup files
+*.backup
+meal_planner_web/backend/create_unified_database.py
+meal_planner_web/backend/merge_databases.py
+meal_planner_web/backend/run_migration.py
+meal_planner_web/backend/database_quantity_fix.py
+meal_planner_web/backend/migration_phase3.sql
+
+# Saved meal plans
+meal_planner_web/meal_plans/

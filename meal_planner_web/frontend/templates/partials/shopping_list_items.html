@@ -1,0 +1,87 @@
+<!-- Shopping list items grouped by category -->
+{% if items and items|length > 0 %}
+    {% set items_by_category = {} %}
+    {% for item in items %}
+        {% set cat = item.category or 'Other' %}
+        {% if cat not in items_by_category %}
+            {% set _ = items_by_category.update({cat: []}) %}
+        {% endif %}
+        {% set _ = items_by_category[cat].append(item) %}
+    {% endfor %}
+    
+    <!-- Show all categories that have items -->
+    {% for category, cat_items in items_by_category.items() %}
+        <div class="bg-white rounded-lg shadow mb-4">
+            <div class="bg-gray-100 px-4 py-3 border-b border-gray-200">
+                <h3 class="font-semibold text-gray-900">
+                    {% if category == 'Produce' %}🥬
+                    {% elif category == 'Dairy' %}🥛
+                    {% elif category in ['Meat', 'Meat & Fish'] %}🥩
+                    {% elif category == 'Pantry' %}🥫
+                    {% elif category == 'Bakery' %}🍞
+                    {% elif category == 'Frozen' %}🧊
+                    {% elif category == 'Beverages' %}🥤
+                    {% else %}📦
+                    {% endif %}
+                    {{ category }}
+                    <span class="text-sm text-gray-600 font-normal ml-2">
+                        ({{ cat_items|length }} items)
+                    </span>
+                </h3>
+            </div>
+            <div class="divide-y divide-gray-200">
+                {% for item in cat_items %}
+                <div class="px-4 py-3 hover:bg-gray-50 transition {% if item.checked %}opacity-50{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 flex-1">
+                            <!-- Checkbox with form submission -->
+                            <form method="post" action="/shopping-list/toggle/{{ item.id }}" style="display: inline;">
+                                <input type="checkbox" 
+                                       {% if item.checked %}checked{% endif %}
+                                       onchange="this.form.submit()"
+                                       class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer">
+                            </form>
+                            
+                            <!-- Item Details -->
+                            <div class="flex-1 {% if item.checked %}line-through text-gray-500{% endif %}">
+                                <span class="font-medium">{{ item.item_name }}</span>
+                                {% if item.quantity %}
+                                <span class="text-sm text-gray-600 ml-2">{{ item.quantity }}</span>
+                                {% endif %}
+                                {% if item.price_estimate %}
+                                <span class="text-sm text-gray-500 ml-2">
+                                    (~{{ "%.2f"|format(item.price_estimate) }} kr)
+                                </span>
+                                {% endif %}
+                                {% if item.source == 'offer' %}
+                                <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                                    From offer
+                                </span>
+                                {% elif item.source == 'meal_plan' %}
+                                <span class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                                    From meal plan
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Remove Button -->
+                        <form method="post" action="/shopping-list/item/{{ item.id }}/delete" style="display: inline;">
+                            <button type="submit"
+                                    onclick="return confirm('Remove this item?')"
+                                    class="text-red-600 hover:text-red-800 transition px-2 py-1">
+                                🗑️
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class='text-center py-8 text-gray-500'>
+        <p class='text-lg font-medium mb-2'>No items in shopping list</p>
+        <p class='text-sm'>Add items using the form above</p>
+    </div>
+{% endif %}

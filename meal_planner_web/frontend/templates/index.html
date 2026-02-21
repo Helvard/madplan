@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍽️ Meal Planner</title>
+    
+    <!-- htmx -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Custom scrollbar for chat */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* htmx loading indicator */
+        .htmx-indicator {
+            display: none;
+        }
+        .htmx-request .htmx-indicator {
+            display: block;
+        }
+        .htmx-request.htmx-indicator {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        {% set current_page = 'plan' %}
+        {% include 'partials/navigation.html' %}
+
+        <!-- Main Chat Container -->
+        <main class="flex-1 container mx-auto px-4 py-8 max-w-4xl">
+            <!-- Selected Offers Banner (if any) -->
+            {% if selected_offers and selected_offers|length > 0 %}
+            <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
+                <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 text-3xl">🎯</div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-blue-900 text-lg mb-2">Must-Use Ingredients Selected</h3>
+                        <p class="text-sm text-blue-800 mb-3">You've selected these items from offers. They will be included in your meal plan:</p>
+                        <div class="space-y-2">
+                            {% for offer in selected_offers %}
+                            <div class="flex items-center gap-2 bg-white rounded px-3 py-2">
+                                <span class="font-semibold text-blue-900">{{ offer.quantity }}x</span>
+                                <span class="text-gray-800">{{ offer.name }}</span>
+                                {% if offer.price %}
+                                <span class="text-sm text-gray-500 ml-auto">{{ offer.price }}</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <a href="/offers" class="text-sm text-blue-700 hover:text-blue-900 underline">
+                                Add more items
+                            </a>
+                            <span class="text-gray-400">•</span>
+                            <button onclick="clearSelectedOffers()" class="text-sm text-red-600 hover:text-red-800 underline">
+                                Clear all selections
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Browse Offers CTA (only show if no items selected) -->
+            {% if not selected_offers or selected_offers|length == 0 %}
+            <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold text-gray-800">Want to browse current offers first?</h3>
+                        <p class="text-sm text-gray-600">Select specific items to include in your meal plan</p>
+                    </div>
+                    <a href="/offers" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition whitespace-nowrap">
+                        Browse Offers →
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="bg-white rounded-lg shadow-lg h-[calc(100vh-300px)] flex flex-col">
+                
+                <!-- Chat Messages Area -->
+                <div id="chat-messages" class="chat-messages flex-1 overflow-y-auto p-6 space-y-4">
+                    <!-- Messages will be inserted here via htmx -->
+                    <div class="text-center text-gray-500 py-8">
+                        <p class="text-lg mb-4">Welcome to Meal Planner! 👋</p>
+                        {% if selected_offers and selected_offers|length > 0 %}
+                        <p class="text-sm text-gray-600 mb-4">Ready to plan meals using your selected ingredients?</p>
+                        {% endif %}
+                        <button 
+                            hx-post="/chat/start" 
+                            hx-target="#chat-messages"
+                            hx-swap="innerHTML"
+                            class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
+                        >
+                            Start Planning
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t p-4">
+                    <form 
+                        id="chat-form"
+                        hx-post="/chat/message" 
+                        hx-target="#chat-messages"
+                        hx-swap="beforeend"
+                        class="flex gap-2"
+                    >
+                        <input type="hidden" id="session-id" name="session_id" value="">
+                        <input 
+                            type="text" 
+                            name="message"
+                            id="message-input"
+                            placeholder="Type your message..."
+                            class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            autocomplete="off"
+                        >
+                        <button 
+                            type="submit"
+                            class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+                        >
+                            Send
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white text-center py-4">
+            <p class="text-sm">Meal Planner • Powered by Claude AI</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-scroll to bottom when new messages arrive
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id === 'chat-messages') {
+                const chatContainer = document.getElementById('chat-messages');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                // Clear input after sending
+                document.getElementById('message-input').value = '';
+            }
+        });
+
+        // Store session ID when chat starts
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            const sessionIdElement = event.detail.target.querySelector('[data-session-id]');
+            if (sessionIdElement) {
+                const sessionId = sessionIdElement.getAttribute('data-session-id');
+                document.getElementById('session-id').value = sessionId;
+            }
+        });
+        
+        // Clear selected offers
+        function clearSelectedOffers() {
+            if (confirm('Clear all selected items? You can always select more from the offers page.')) {
+                // Call endpoint to clear session
+                fetch('/offers/clear-selected', { method: 'POST' })
+                    .then(() => {
+                        window.location.reload();
+                    });
+            }
+        }
+    </script>
+</body>
+</html>

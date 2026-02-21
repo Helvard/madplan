@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rema 1000 Offers - Meal Planner</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation Bar with Badges -->
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex space-x-8">
+                    <a href="/" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        🍽️ Plan
+                    </a>
+                    <a href="/offers" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-600 border-b-2 border-green-600">
+                        🏷️ Offers
+                        <span id="selected-count-badge" class="ml-2 hidden px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">0</span>
+                    </a>
+                    <a href="/shopping-list" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        🛒 Shopping List
+                        <span id="shopping-list-badge" class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full" 
+                              hx-get="/shopping-list/badge"
+                              hx-trigger="load, shopping-list-updated from:body"
+                              hx-swap="innerHTML">0</span>
+                    </a>
+                    <a href="/history" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        📚 History
+                    </a>
+                    <a href="/preferences" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        ⚙️ Preferences
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Current Offers from Rema 1000</h1>
+            <p class="mt-2 text-gray-600">Select items to include in meal planning or add directly to shopping list</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="mb-6 bg-white rounded-lg shadow p-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                    <input type="text" 
+                           id="search-input" 
+                           placeholder="Search offers..."
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                           hx-get="/offers/filter"
+                           hx-trigger="keyup changed delay:300ms"
+                           hx-include="[name='department'],[name='sort']"
+                           hx-target="#offers-list">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                    <select name="department" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                            hx-get="/offers/filter"
+                            hx-trigger="change"
+                            hx-include="[name='search'],[name='sort']"
+                            hx-target="#offers-list">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                    <select name="sort" 
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                            hx-get="/offers/filter"
+                            hx-trigger="change"
+                            hx-include="[name='search'],[name='department']"
+                            hx-target="#offers-list">
+                        <option value="savings">Highest Savings</option>
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="name">Name A-Z</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message Area -->
+        <div id="success-message" class="mb-4"></div>
+
+        <!-- Offers Form -->
+        <form id="offers-form" hx-post="/offers/submit-selections" hx-target="#success-message" hx-swap="innerHTML">
+            <div id="offers-list" class="space-y-3">
+                {% for offer in offers %}
+                <div class="bg-white rounded-lg shadow hover:shadow-md transition p-4 border border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-gray-900">{{ offer.name }}</h3>
+                            {% if offer.underline %}
+                            <p class="text-sm text-gray-600">{{ offer.underline }}</p>
+                            {% endif %}
+                            <div class="mt-2 flex items-center gap-4">
+                                <span class="text-2xl font-bold text-green-600">{{ offer.price }}</span>
+                                {% if offer.normal_price %}
+                                <span class="text-sm text-gray-500 line-through">{{ offer.normal_price }}</span>
+                                <span class="text-sm font-semibold text-red-600">Save {{ offer.savings_percent|int }}%</span>
+                                {% endif %}
+                            </div>
+                            {% if offer.price_per_unit %}
+                            <p class="text-xs text-gray-500 mt-1">{{ offer.price_per_unit }}</p>
+                            {% endif %}
+                            <div class="mt-1">
+                                <span class="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                    {{ offer.department or 'Other' }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Dual Checkboxes with Quantity Inputs -->
+                        <div class="flex flex-col gap-3 ml-4">
+                            <!-- Meal Plan Selection -->
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox" 
+                                           id="meal_plan_{{ offer.product_id }}"
+                                           name="meal_plan_{{ offer.product_id }}"
+                                           value="{{ offer.product_id }}"
+                                           class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                           onchange="updateSelectedCount(); toggleQuantityInput('meal_plan_qty_{{ offer.product_id }}', this.checked)">
+                                    <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 whitespace-nowrap">
+                                        📋 Meal Plan
+                                    </span>
+                                </label>
+                                <input type="number" 
+                                       id="meal_plan_qty_{{ offer.product_id }}"
+                                       name="meal_plan_qty_{{ offer.product_id }}"
+                                       min="1"
+                                       value="1"
+                                       disabled
+                                       class="w-16 px-2 py-1 text-sm border border-gray-300 rounded disabled:bg-gray-100 disabled:text-gray-400"
+                                       placeholder="Qty">
+                            </div>
+                            
+                            <!-- Shopping List Selection -->
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox" 
+                                           id="shopping_list_{{ offer.product_id }}"
+                                           name="shopping_list_{{ offer.product_id }}"
+                                           value="{{ offer.product_id }}"
+                                           class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                                           onchange="updateSelectedCount(); toggleQuantityInput('shopping_list_qty_{{ offer.product_id }}', this.checked)">
+                                    <span class="text-sm font-medium text-gray-700 group-hover:text-green-600 whitespace-nowrap">
+                                        🛒 Shopping List
+                                    </span>
+                                </label>
+                                <input type="number" 
+                                       id="shopping_list_qty_{{ offer.product_id }}"
+                                       name="shopping_list_qty_{{ offer.product_id }}"
+                                       min="1"
+                                       value="1"
+                                       disabled
+                                       class="w-16 px-2 py-1 text-sm border border-gray-300 rounded disabled:bg-gray-100 disabled:text-gray-400"
+                                       placeholder="Qty">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Submit Button (Sticky) -->
+            <div class="fixed bottom-6 right-6">
+                <button type="submit" 
+                        id="submit-button"
+                        class="bg-green-600 text-white px-8 py-4 rounded-full shadow-lg hover:bg-green-700 transition transform hover:scale-105 font-semibold text-lg flex items-center gap-2">
+                    <span>Submit Selections</span>
+                    <span id="submit-count" class="hidden px-3 py-1 bg-white text-green-600 rounded-full text-sm font-bold">0</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function toggleQuantityInput(inputId, enabled) {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.disabled = !enabled;
+                if (enabled) {
+                    input.classList.remove('bg-gray-100', 'text-gray-400');
+                    input.classList.add('bg-white', 'text-gray-900');
+                } else {
+                    input.classList.remove('bg-white', 'text-gray-900');
+                    input.classList.add('bg-gray-100', 'text-gray-400');
+                }
+            }
+        }
+        
+        function updateSelectedCount() {
+            // Count checked checkboxes
+            const mealPlanChecked = document.querySelectorAll('input[name^="meal_plan_"]:not([name*="_qty_"]):checked').length;
+            const shoppingListChecked = document.querySelectorAll('input[name^="shopping_list_"]:not([name*="_qty_"]):checked').length;
+            const total = mealPlanChecked + shoppingListChecked;
+            
+            // Update badge
+            const badge = document.getElementById('selected-count-badge');
+            const submitCount = document.getElementById('submit-count');
+            const submitButton = document.getElementById('submit-button');
+            
+            if (total > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = total;
+                submitCount.classList.remove('hidden');
+                submitCount.textContent = total;
+                submitButton.classList.remove('bg-green-600');
+                submitButton.classList.add('bg-green-600', 'animate-pulse');
+            } else {
+                badge.classList.add('hidden');
+                submitCount.classList.add('hidden');
+                submitButton.classList.remove('animate-pulse');
+                submitButton.classList.add('bg-green-600');
+            }
+        }
+
+        // Update count on page load
+        document.addEventListener('DOMContentLoaded', updateSelectedCount);
+    </script>
+</body>
+</html>

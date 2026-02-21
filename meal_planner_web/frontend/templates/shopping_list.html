@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping List - Meal Planner</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex space-x-8">
+                    <a href="/" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        🍽️ Plan
+                    </a>
+                    <a href="/offers" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        🏷️ Offers
+                    </a>
+                    <a href="/shopping-list" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-600 border-b-2 border-green-600">
+                        🛒 Shopping List
+                    </a>
+                    <a href="/history" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        📚 History
+                    </a>
+                    <a href="/preferences" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition">
+                        ⚙️ Preferences
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">🛒 Shopping List</h1>
+                {% if shopping_list %}
+                <p class="text-gray-600 mt-1">{{ shopping_list.name }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if items and items|length > 0 %}
+        <!-- Progress Bar -->
+        <div class="mb-6">
+            {% include 'partials/shopping_list_stats.html' %}
+        </div>
+
+        <!-- Add Item Form -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 class="font-semibold text-gray-900 mb-3">Add Item Manually</h3>
+            <form method="post" action="/shopping-list/add-item" class="flex gap-3">
+                <input type="text" 
+                       name="item_name" 
+                       placeholder="Item name..."
+                       class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+                       required>
+                <input type="text" 
+                       name="quantity" 
+                       placeholder="Qty"
+                       class="w-24 border border-gray-300 rounded-lg px-4 py-2">
+                <button type="submit" 
+                        class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                    + Add
+                </button>
+            </form>
+        </div>
+
+        <!-- Shopping List Items -->
+        <div id="shopping-list-items">
+            {% include 'partials/shopping_list_items.html' %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 flex gap-3">
+            <form method="post" action="/shopping-list/clear-checked" style="display: inline;">
+                <button type="submit"
+                        onclick="return confirm('Remove all checked items?')"
+                        class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
+                    Clear Checked Items
+                </button>
+            </form>
+            <form method="post" action="/shopping-list/clear-all" style="display: inline;">
+                <button type="submit"
+                        onclick="return confirm('Remove ALL items?')"
+                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                    Clear All Items
+                </button>
+            </form>
+        </div>
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-12 bg-white rounded-lg shadow">
+            <div class="text-6xl mb-4">🛒</div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Your shopping list is empty</h3>
+            <p class="text-gray-600 mb-6">Add items from offers or manually</p>
+            
+            <!-- Add First Item Form -->
+            <div class="max-w-md mx-auto mb-6">
+                <form method="post" action="/shopping-list/add-item" class="flex gap-3">
+                    <input type="text" 
+                           name="item_name" 
+                           placeholder="Add your first item..."
+                           class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+                           required>
+                    <button type="submit" 
+                            class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                        + Add
+                    </button>
+                </form>
+            </div>
+            
+            <div class="flex gap-3 justify-center">
+                <a href="/offers" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    Browse Offers
+                </a>
+                <a href="/" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                    Plan Meals
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
