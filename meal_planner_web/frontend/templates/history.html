@@ -1,100 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meal History - Meal Planner</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex flex-col">
-        <!-- Header -->
-        {% set current_page = 'history' %}  <!-- Change this per page -->
-        {% include 'partials/navigation.html' %}
-        </header>
+{% set current_page = 'history' %}
+{% extends 'base.html' %}
 
-        <!-- Main Content -->
-        <main class="flex-1 container mx-auto px-4 py-8 max-w-6xl">
-            <div class="bg-white rounded-lg shadow-lg p-8">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-3xl font-bold text-gray-800">📊 Meal History</h2>
-                    <a href="/rate-meals" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
-                        ⭐ Rate Meals
-                    </a>
-                </div>
-                
-                {% if history %}
-                    <div class="space-y-6">
-                        {% for item in history %}
-                        <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
-                                        {{ item.meal_name }}
-                                    </h3>
-                                    <div class="text-sm text-gray-600 space-y-1">
-                                        <p><span class="font-medium">Date:</span> {{ item.plan_date }}</p>
-                                        {% if item.day_number %}
-                                        <p><span class="font-medium">Day:</span> {{ item.day_number }}</p>
-                                        {% endif %}
-                                        {% if item.cost_estimate %}
-                                        <p><span class="font-medium">Cost:</span> {{ item.cost_estimate }} kr</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                
-                                <div class="ml-4">
-                                    {% if item.rating %}
-                                    <div class="text-yellow-500 text-xl">
-                                        {% for i in range(item.rating) %}★{% endfor %}
-                                        {% for i in range(5 - item.rating) %}☆{% endfor %}
-                                    </div>
-                                    {% else %}
-                                    <span class="text-gray-400 text-sm">Not rated</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            {% if item.comments %}
-                            <div class="mt-4 p-3 bg-gray-50 rounded border-l-4 border-green-500">
-                                <p class="text-sm text-gray-700">💬 {{ item.comments }}</p>
-                            </div>
+{% block title %}Meal History - Meal Planner{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">📊 Meal History</h2>
+            <a href="/rate-meals" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                ⭐ Rate Meals
+            </a>
+        </div>
+
+        {% if history %}
+        <div class="space-y-6">
+            {% for item in history %}
+            <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">{{ item.meal_name }}</h3>
+                        <div class="text-sm text-gray-600 space-y-1">
+                            <p><span class="font-medium">Date:</span> {{ item.plan_date }}</p>
+                            {% if item.day_number %}
+                            <p><span class="font-medium">Day:</span> {{ item.day_number }}</p>
                             {% endif %}
-                            
-                            {% if item.would_repeat is not none %}
-                            <div class="mt-3">
-                                {% if item.would_repeat %}
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    ✅ Would make again
-                                </span>
-                                {% else %}
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    ❌ Skip next time
-                                </span>
-                                {% endif %}
-                            </div>
+                            {% if item.cost_estimate %}
+                            <p><span class="font-medium">Cost:</span> {{ item.cost_estimate }} kr</p>
                             {% endif %}
                         </div>
-                        {% endfor %}
                     </div>
-                {% else %}
-                    <div class="text-center py-12">
-                        <p class="text-gray-500 text-lg mb-4">No meal history yet.</p>
-                        <p class="text-gray-400 mb-6">Start planning meals to build your history!</p>
-                        <a href="/" class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
-                            Create Your First Meal Plan
-                        </a>
+                    <div class="ml-4">
+                        {% if item.rating %}
+                        <div class="text-yellow-500 text-xl">
+                            {% for i in range(item.rating) %}★{% endfor %}{% for i in range(5 - item.rating) %}☆{% endfor %}
+                        </div>
+                        {% else %}
+                        <span class="text-gray-400 text-sm">Not rated</span>
+                        {% endif %}
                     </div>
+                </div>
+                {% if item.comments %}
+                <div class="mt-4 p-3 bg-gray-50 rounded border-l-4 border-green-500">
+                    <p class="text-sm text-gray-700">💬 {{ item.comments }}</p>
+                </div>
+                {% endif %}
+                {% if item.would_repeat is not none %}
+                <div class="mt-3">
+                    {% if item.would_repeat %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Would make again</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Skip next time</span>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="bg-gray-800 text-white text-center py-4">
-            <p class="text-sm">Meal Planner • Powered by Claude AI</p>
-        </footer>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <p class="text-gray-500 text-lg mb-4">No meal history yet.</p>
+            <p class="text-gray-400 mb-6">Start planning meals to build your history!</p>
+            <a href="/" class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
+                Create Your First Meal Plan
+            </a>
+        </div>
+        {% endif %}
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

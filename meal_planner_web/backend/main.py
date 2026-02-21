@@ -13,6 +13,7 @@ import json
 import os
 from datetime import datetime
 from typing import Optional
+from html import escape
 import markdown
 
 from starlette.middleware.sessions import SessionMiddleware
@@ -288,7 +289,7 @@ async def start_chat(request: Request):
     # Return initial bot message
     return templates.TemplateResponse("partials/message.html", {
         "request": request,
-        "message": "👋 Hi! Ready to plan your meals for the week?",
+        "message": markdown.markdown("👋 Hi! Ready to plan your meals for the week?"),
         "is_bot": True,
         "session_id": session_id
     })
@@ -368,7 +369,7 @@ async def chat_message(
     # Return bot response
     bot_msg = templates.TemplateResponse("partials/message.html", {
         "request": request,
-        "message": bot_response,
+        "message": markdown.markdown(bot_response),
         "is_bot": True,
         "session_id": session_id,
         "trigger_generation": (session["state"] == "generating")  # Auto-trigger if we just entered generating state
@@ -497,7 +498,7 @@ async def accept_plan(request: Request, session_id: str = Form(...)):
     
     return templates.TemplateResponse("partials/message.html", {
         "request": request,
-        "message": bot_response,
+        "message": markdown.markdown(bot_response),
         "is_bot": True,
         "session_id": session_id
     })
@@ -1147,18 +1148,20 @@ Be conversational and helpful!"""
         bot_response = "Sorry, I had trouble with that. Could you try rephrasing?"
     
     # Return both user message and bot response
+    safe_message = escape(message)
+    safe_bot_response = markdown.markdown(bot_response)
     return HTMLResponse(f"""
     <div class="flex items-start gap-3 justify-end">
         <div class="flex-1 bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl text-right">
-            <div class="prose prose-sm">{message}</div>
+            <div class="prose prose-sm">{safe_message}</div>
         </div>
         <div class="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">👤</div>
     </div>
-    
+
     <div class="flex items-start gap-3" data-session-id="{session_id}">
         <div class="flex-shrink-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">🤖</div>
         <div class="flex-1 bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl">
-            <div class="prose prose-sm">{bot_response.replace(chr(10), '<br>')}</div>
+            <div class="prose prose-sm">{safe_bot_response}</div>
         </div>
     </div>
     """)
