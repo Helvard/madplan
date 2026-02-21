@@ -676,49 +676,28 @@ async def filter_offers(
     sort: str = "savings"
 ):
     """Filter and sort offers based on user selections."""
-    db = Database()
-    
-    # Get all offers from database
-    conn = db._get_connection()
-    cursor = conn.cursor()
-    
-    # Build query based on filters
-    query = """
-        SELECT 
-            product_id, name, underline, price, price_numeric,
-            normal_price, savings_percent, price_per_unit,
-            department, category
-        FROM offers
-        WHERE 1=1
-    """
-    params = []
-    
-    # Add search filter
-    if search:
-        query += " AND (name LIKE ? OR underline LIKE ?)"
-        search_pattern = f"%{search}%"
-        params.extend([search_pattern, search_pattern])
-    
-    # Add department filter
+    query = db._client.table("offers").select(
+        "product_id, name, underline, price, price_numeric, normal_price, savings_percent, price_per_unit, department, category"
+    )
+
     if department:
-        query += " AND department = ?"
-        params.append(department)
-    
-    # Add sorting
-    if sort == "savings":
-        query += " ORDER BY savings_percent DESC"
-    elif sort == "price_asc":
-        query += " ORDER BY price_numeric ASC"
-    elif sort == "price_desc":
-        query += " ORDER BY price_numeric DESC"
-    elif sort == "name":
-        query += " ORDER BY name ASC"
-    else:
-        query += " ORDER BY savings_percent DESC"
-    
-    cursor.execute(query, params)
-    offers = [dict(row) for row in cursor.fetchall()]
-    conn.close()
+        query = query.eq("department", department)
+
+    sort_col, sort_desc = {
+        "savings":    ("savings_percent", True),
+        "price_asc":  ("price_numeric",   False),
+        "price_desc": ("price_numeric",   True),
+        "name":       ("name",            False),
+    }.get(sort, ("savings_percent", True))
+    query = query.order(sort_col, desc=sort_desc)
+
+    res = query.execute()
+    offers = res.data or []
+
+    # Apply search client-side (postgrest ilike requires column to be indexed)
+    if search:
+        s = search.lower()
+        offers = [o for o in offers if s in (o.get("name") or "").lower() or s in (o.get("underline") or "").lower()]
     
     # Return just the offers list HTML (for htmx to swap in)
     html_parts = []
@@ -753,7 +732,7 @@ async def filter_offers(
                                    name="meal_plan_{offer['product_id']}"
                                    value="{offer['product_id']}"
                                    class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                   onchange="updateSelectedCount(); toggleQuantityInput('meal_plan_qty_{offer['product_id']}', this.checked)">
+                                   onchange="updateSelectedCount(); toggleQty('meal_plan_qty_{offer['product_id']}', this.checked)">
                             <span class="text-sm font-medium text-gray-700 group-hover:text-blue-600 whitespace-nowrap">
                                 📋 Meal Plan
                             </span>
@@ -776,7 +755,7 @@ async def filter_offers(
                                    name="shopping_list_{offer['product_id']}"
                                    value="{offer['product_id']}"
                                    class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500"
-                                   onchange="updateSelectedCount(); toggleQuantityInput('shopping_list_qty_{offer['product_id']}', this.checked)">
+                                   onchange="updateSelectedCount(); toggleQty('shopping_list_qty_{offer['product_id']}', this.checked)">
                             <span class="text-sm font-medium text-gray-700 group-hover:text-green-600 whitespace-nowrap">
                                 🛒 Shopping List
                             </span>

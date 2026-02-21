@@ -94,13 +94,14 @@ class Database:
 
     def get_meal_history_for_context(self, weeks_back: int = 4) -> str:
         """Get meal history formatted for Claude's context."""
-        cutoff = f"now() - interval '{weeks_back * 7} days'"
+        from datetime import date, timedelta
+        cutoff_date = (date.today() - timedelta(weeks=weeks_back)).isoformat()
 
         # Recent meals (to avoid repetition)
         recent_res = (
             self.db.table("meal_history")
             .select("meal_name")
-            .gte("plan_date", f"(select ({cutoff})::date)")
+            .gte("plan_date", cutoff_date)
             .execute()
         )
         recent_meal_names = list({r["meal_name"] for r in (recent_res.data or [])})
