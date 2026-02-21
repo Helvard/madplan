@@ -1,0 +1,37 @@
+# Drop this in /etc/nginx/sites-available/madplan
+# then: sudo ln -s /etc/nginx/sites-available/madplan /etc/nginx/sites-enabled/
+# and:  sudo certbot --nginx -d yourdomain.com
+
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header Referrer-Policy strict-origin-when-cross-origin;
+
+    # Proxy to FastAPI container
+    location / {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Required for htmx streaming / SSE if you add it later
+        proxy_buffering    off;
+        proxy_read_timeout 120s;
+    }
+}

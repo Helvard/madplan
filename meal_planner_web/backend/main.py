@@ -430,6 +430,11 @@ async def generate_plan(request: Request, session_id: str = Form(...)):
         })
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Render the main chat interface."""

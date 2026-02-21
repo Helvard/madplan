@@ -1,0 +1,27 @@
+{
+  "name": "madplan",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "tailwindcss -i meal_planner_web/frontend/static/css/input.css -o meal_planner_web/frontend/static/css/styles.css --content 'meal_planner_web/frontend/templates/**/*.html' --minify",
+    "watch:css": "tailwindcss -i meal_planner_web/frontend/static/css/input.css -o meal_planner_web/frontend/static/css/styles.css --content 'meal_planner_web/frontend/templates/**/*.html' --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Helvard/madplan.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Helvard/madplan/issues"
+  },
+  "homepage": "https://github.com/Helvard/madplan#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "tailwindcss": "^4.2.0"
+  }
+}

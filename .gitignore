@@ -31,3 +31,9 @@ meal_planner_web/backend/migration_phase3.sql
 
 # Saved meal plans
 meal_planner_web/meal_plans/
+
+# Node (Tailwind build tools — not needed in repo)
+node_modules/
+
+# Tailwind input source (output styles.css IS committed)
+meal_planner_web/frontend/static/css/input.css

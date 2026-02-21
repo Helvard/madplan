@@ -1,0 +1,19 @@
+.env
+.git
+.claude/
+venv/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+data/
+*.backup
+migrate_sqlite_to_supabase.py
+meal_planner_web/meal_plans/
+meal_planner_web/backend/database\ copy.py
+meal_planner_web/backend/preferences.py
+meal_planner_web/frontend/static/css/input.css
+BACKEND_EVALUATION.md
+FRONTEND_EVALUATION.md
+ADDITIONAL_FINDINGS.md
