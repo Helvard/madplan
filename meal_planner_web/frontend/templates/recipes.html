@@ -1,0 +1,140 @@
+{% set current_page = 'recipes' %}
+{% extends 'base.html' %}
+
+{% block title %}Recipes — Family Food Almanac{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+
+    <!-- Page header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-800">📖 Recipes</h2>
+            <p class="text-gray-500 mt-1">Your family's collected food knowledge</p>
+        </div>
+        <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
+            {{ recipes|length }} saved
+        </span>
+    </div>
+
+    <!-- Creation panel -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+
+        <!-- Generate with AI -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 class="font-semibold text-gray-700 mb-3">🤖 Generate with AI</h3>
+            <form method="post" action="/recipes/generate" class="flex flex-col gap-2">
+                <input
+                    type="text"
+                    name="description"
+                    placeholder="e.g. quick pasta that kids love, or creamy fish soup"
+                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    required
+                >
+                <button
+                    type="submit"
+                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-medium"
+                >
+                    Generate Recipe
+                </button>
+            </form>
+        </div>
+
+        <!-- Import from URL -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 class="font-semibold text-gray-700 mb-3">🌐 Import from URL</h3>
+            <form method="post" action="/recipes/import-url" class="flex flex-col gap-2">
+                <input
+                    type="url"
+                    name="url"
+                    placeholder="https://example.com/recipe/pasta-bake"
+                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    required
+                >
+                <button
+                    type="submit"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                >
+                    Import Recipe
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Search + tag filters -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input
+                type="text"
+                id="search-input"
+                placeholder="Search recipes…"
+                class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                hx-get="/recipes/search"
+                hx-trigger="keyup changed delay:300ms"
+                hx-target="#recipe-grid"
+                hx-swap="innerHTML"
+                name="q"
+            >
+        </div>
+        {% if all_tags %}
+        <div class="flex flex-wrap gap-2 mt-3">
+            <button
+                onclick="filterByTag('')"
+                id="tag-all"
+                class="px-3 py-1 rounded-full text-xs border border-green-500 bg-green-500 text-white font-medium"
+            >All</button>
+            {% for tag in all_tags %}
+            <button
+                onclick="filterByTag('{{ tag }}')"
+                class="tag-chip px-3 py-1 rounded-full text-xs border border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-700 transition"
+                data-tag="{{ tag }}"
+            >{{ tag }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recipe grid -->
+    <div id="recipe-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {% if recipes %}
+            {% for recipe in recipes %}
+            {% include 'partials/recipe_card.html' %}
+            {% endfor %}
+        {% else %}
+        <div class="col-span-full text-center py-16">
+            <p class="text-5xl mb-4">🍳</p>
+            <p class="text-gray-500 text-lg mb-2">No recipes saved yet.</p>
+            <p class="text-gray-400 text-sm">Generate one with AI, import from a URL, or save a meal from your plan history.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterByTag(tag) {
+    // Update button styles
+    document.querySelectorAll('.tag-chip, #tag-all').forEach(btn => {
+        btn.classList.remove('bg-green-500', 'text-white', 'border-green-500');
+        btn.classList.add('border-gray-300', 'text-gray-600');
+    });
+    const active = tag
+        ? document.querySelector(`[data-tag="${tag}"]`)
+        : document.getElementById('tag-all');
+    if (active) {
+        active.classList.add('bg-green-500', 'text-white', 'border-green-500');
+        active.classList.remove('border-gray-300', 'text-gray-600');
+    }
+
+    // Fetch filtered results
+    const q = document.getElementById('search-input').value;
+    const params = new URLSearchParams({ q, tag });
+    htmx.ajax('GET', '/recipes/search?' + params.toString(), {
+        target: '#recipe-grid',
+        swap: 'innerHTML',
+    });
+}
+</script>
+{% endblock %}

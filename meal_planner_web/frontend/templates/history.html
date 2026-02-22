@@ -30,7 +30,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="ml-4">
+                    <div class="ml-4 flex flex-col items-end gap-2">
                         {% if item.rating %}
                         <div class="text-yellow-500 text-xl">
                             {% for i in range(item.rating) %}★{% endfor %}{% for i in range(5 - item.rating) %}☆{% endfor %}
@@ -38,6 +38,15 @@
                         {% else %}
                         <span class="text-gray-400 text-sm">Not rated</span>
                         {% endif %}
+                        <!-- Save as Recipe -->
+                        <form method="post" action="/recipes/save-from-meal-plan" class="inline">
+                            <input type="hidden" name="meal_name" value="{{ item.meal_name }}">
+                            <button type="submit"
+                                    class="text-xs bg-green-50 border border-green-300 text-green-700 px-3 py-1 rounded-full hover:bg-green-100 transition"
+                                    title="Let Claude generate a full recipe for this meal">
+                                📖 Save as Recipe
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% if item.comments %}

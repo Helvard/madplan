@@ -1,0 +1,44 @@
+<!-- partials/recipe_chat_message.html -->
+<!-- A single message bubble in the per-recipe AI sidebar chat -->
+
+<div class="flex items-start gap-2 {% if role == 'user' %}flex-row-reverse{% endif %} mb-3">
+    <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold
+        {% if role == 'user' %}bg-blue-500{% else %}bg-green-600{% endif %}">
+        {% if role == 'user' %}You{% else %}🤖{% endif %}
+    </div>
+    <div class="max-w-xs rounded-lg px-3 py-2 text-sm
+        {% if role == 'user' %}bg-blue-50 text-blue-900{% else %}bg-gray-50 text-gray-800{% endif %}">
+        {% if content_html %}
+            <div class="prose prose-sm max-w-none">{{ content_html | safe }}</div>
+        {% else %}
+            {{ content }}
+        {% endif %}
+    </div>
+</div>
+
+<!-- Re-render the input form so HTMX targets stay fresh after each swap -->
+{% if role == 'assistant' %}
+<div id="recipe-chat-input-{{ recipe_id }}">
+    <form
+        hx-post="/recipes/{{ recipe_id }}/chat/message"
+        hx-target="#recipe-chat-messages"
+        hx-swap="beforeend"
+        hx-on::after-request="this.reset(); document.getElementById('recipe-chat-messages').scrollTop = 9999"
+        class="flex gap-2"
+    >
+        <input type="hidden" name="session_key" value="{{ session_key }}">
+        <input
+            type="text"
+            name="message"
+            placeholder="Ask about this recipe…"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            required
+            autofocus
+        >
+        <button
+            type="submit"
+            class="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 text-sm transition"
+        >Send</button>
+    </form>
+</div>
+{% endif %}

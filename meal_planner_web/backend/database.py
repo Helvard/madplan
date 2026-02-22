@@ -538,6 +538,80 @@ class Database:
         )
         return res.data or []
 
+    # ========== RECIPES ==========
+
+    def save_recipe(self, household_id, data: Dict) -> Dict:
+        """Insert a new recipe and return the created row."""
+        row = {
+            "name": data["name"],
+            "description": data.get("description", ""),
+            "ingredients": data.get("ingredients", []),
+            "instructions": data.get("instructions", ""),
+            "servings": data.get("servings"),
+            "cook_time_minutes": data.get("cook_time_minutes"),
+            "tags": data.get("tags", []),
+            "source": data.get("source", "manual"),
+            "source_url": data.get("source_url"),
+            "notes": data.get("notes", ""),
+        }
+        if household_id:
+            row["household_id"] = household_id
+        res = self.db.table("recipes").insert(row).execute()
+        return res.data[0]
+
+    def get_recipes(self, household_id, search: str = None, tag: str = None) -> List[Dict]:
+        """List all recipes for a household, with optional search and tag filter."""
+        q = (
+            self.db.table("recipes")
+            .select("id, name, description, cook_time_minutes, servings, tags, source, rating, created_at")
+            .order("created_at", desc=True)
+        )
+        if household_id:
+            q = q.eq("household_id", household_id)
+        if search:
+            q = q.ilike("name", f"%{search}%")
+        if tag:
+            q = q.contains("tags", [tag])
+        return q.execute().data or []
+
+    def get_recipe(self, recipe_id: int, household_id) -> Optional[Dict]:
+        """Get a single recipe by ID, scoped to household."""
+        q = (
+            self.db.table("recipes")
+            .select("*")
+            .eq("id", recipe_id)
+        )
+        if household_id:
+            q = q.eq("household_id", household_id)
+        res = q.limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def update_recipe(self, recipe_id: int, household_id, updates: Dict) -> Optional[Dict]:
+        """Patch specific fields on a recipe."""
+        q = (
+            self.db.table("recipes")
+            .update(updates)
+            .eq("id", recipe_id)
+        )
+        if household_id:
+            q = q.eq("household_id", household_id)
+        res = q.execute()
+        return res.data[0] if res.data else None
+
+    def delete_recipe(self, recipe_id: int, household_id):
+        """Delete a recipe."""
+        q = self.db.table("recipes").delete().eq("id", recipe_id)
+        if household_id:
+            q = q.eq("household_id", household_id)
+        q.execute()
+
+    def rate_recipe(self, recipe_id: int, rating: int, notes: str = None):
+        """Set rating and optionally update family notes on a recipe."""
+        updates: Dict = {"rating": rating}
+        if notes is not None:
+            updates["notes"] = notes
+        self.db.table("recipes").update(updates).eq("id", recipe_id).execute()
+
     # ========== HELPERS ==========
 
     def _auto_categorize_item(self, item_name: str) -> str:

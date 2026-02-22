@@ -13,19 +13,44 @@
         
         <div class="mt-6 pt-4 border-t border-green-200">
             <!-- Action Buttons -->
-            <div class="flex gap-3 mb-3">
-                <button 
+            <div class="flex flex-wrap gap-3 mb-3">
+                <button
                     onclick="showShoppingListPrompt('{{ session_id }}')"
                     class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
                 >
                     ✅ Accept Plan
                 </button>
-                <button 
+                <button
                     onclick="document.getElementById('feedback-input-{{ session_id }}').classList.remove('hidden'); this.style.display='none';"
                     class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
                 >
                     🔄 Request Changes
                 </button>
+                <button
+                    onclick="document.getElementById('save-recipe-input-{{ session_id }}').classList.remove('hidden'); this.style.display='none';"
+                    class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition"
+                >
+                    📖 Save a Recipe
+                </button>
+            </div>
+
+            <!-- Save a Recipe from this plan -->
+            <div id="save-recipe-input-{{ session_id }}" class="hidden mb-3">
+                <form method="post" action="/recipes/save-from-meal-plan" class="flex gap-2 items-center">
+                    <input type="hidden" name="meal_plan_text" value="{{ meal_plan_raw | e }}">
+                    <input
+                        type="text"
+                        name="meal_name"
+                        placeholder="Which meal? e.g. Monday's salmon pasta"
+                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm"
+                        required
+                    >
+                    <button
+                        type="submit"
+                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
+                    >Save Recipe</button>
+                </form>
+                <p class="text-xs text-gray-400 mt-1">Claude will generate the full recipe — ingredients, instructions, tips.</p>
             </div>
             
             <!-- Shopping List Prompt (Hidden initially) -->

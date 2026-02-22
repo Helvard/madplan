@@ -1844,6 +1844,343 @@ async def export_shopping_list_pdf(request: Request):
         traceback.print_exc()
         return HTMLResponse(f"Error: {str(e)}", status_code=500)
 
+# ---------------------------------------------------------------------------
+# Recipe routes — Family Food Almanac
+# ---------------------------------------------------------------------------
+
+# In-memory sessions for per-recipe AI sidebar chats
+recipe_chat_sessions = {}
+
+
+def _strip_html(html: str) -> str:
+    """Strip HTML tags and collapse whitespace for Claude ingestion."""
+    from html.parser import HTMLParser
+
+    class _Stripper(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.parts = []
+
+        def handle_data(self, data):
+            self.parts.append(data)
+
+    s = _Stripper()
+    s.feed(html)
+    text = " ".join(s.parts)
+    # Collapse excessive whitespace
+    import re as _re
+    return _re.sub(r'\s+', ' ', text).strip()
+
+
+@app.get("/recipes", response_class=HTMLResponse)
+async def recipes_page(request: Request):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipes = db.get_recipes(household_id)
+    # Collect all unique tags across saved recipes for filter chips
+    all_tags = sorted({tag for r in recipes for tag in (r.get("tags") or [])})
+
+    return templates.TemplateResponse("recipes.html", {
+        "request": request,
+        "user": user,
+        "recipes": recipes,
+        "all_tags": all_tags,
+    })
+
+
+@app.get("/recipes/search", response_class=HTMLResponse)
+async def recipes_search(request: Request, q: str = "", tag: str = ""):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipes = db.get_recipes(household_id, search=q or None, tag=tag or None)
+    html_parts = []
+    card_tpl = templates.env.get_template("partials/recipe_card.html")
+    for recipe in recipes:
+        html_parts.append(card_tpl.render(recipe=recipe))
+
+    if not html_parts:
+        return HTMLResponse(
+            '<p class="text-gray-400 col-span-full text-center py-8">No recipes found.</p>'
+        )
+    return HTMLResponse("".join(html_parts))
+
+
+@app.get("/recipes/{recipe_id}", response_class=HTMLResponse)
+async def recipe_detail(request: Request, recipe_id: int):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipe = db.get_recipe(recipe_id, household_id)
+    if not recipe:
+        return HTMLResponse("Recipe not found", status_code=404)
+
+    return templates.TemplateResponse("recipe_detail.html", {
+        "request": request,
+        "user": user,
+        "recipe": recipe,
+    })
+
+
+@app.post("/recipes/generate", response_class=HTMLResponse)
+async def recipe_generate(
+    request: Request,
+    description: str = Form(...),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    preferences = db.format_for_prompt(household_id=household_id)
+    data = claude.generate_recipe_json(description, preferences=preferences)
+    if not data or not data.get("name"):
+        return HTMLResponse(
+            '<div class="text-red-600 p-4">Could not generate recipe. Please try again.</div>',
+            status_code=500,
+        )
+    data["source"] = "ai_generated"
+    recipe = db.save_recipe(household_id, data)
+    return RedirectResponse(url=f"/recipes/{recipe['id']}", status_code=303)
+
+
+@app.post("/recipes/import-url", response_class=HTMLResponse)
+async def recipe_import_url(
+    request: Request,
+    url: str = Form(...),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    page_text = ""
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            page_text = _strip_html(resp.text)[:8000]
+    except Exception:
+        pass  # Will fall back to inspired generation in extract_recipe_from_url
+
+    data = claude.extract_recipe_from_url(page_text, url)
+    if not data or not data.get("name"):
+        return HTMLResponse(
+            '<div class="text-red-600 p-4">Could not import recipe from that URL. '
+            'Please try a different link or generate manually.</div>',
+            status_code=422,
+        )
+    data["source"] = "web_import"
+    data["source_url"] = url
+    recipe = db.save_recipe(household_id, data)
+    return RedirectResponse(url=f"/recipes/{recipe['id']}", status_code=303)
+
+
+@app.post("/recipes/save-from-meal-plan", response_class=HTMLResponse)
+async def recipe_save_from_meal_plan(
+    request: Request,
+    meal_name: str = Form(...),
+    meal_plan_text: str = Form(""),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    context = meal_plan_text[:3000] if meal_plan_text else ""
+    description = f"'{meal_name}'"
+    if context:
+        description += f" — extract from this meal plan context:\n{context}"
+    preferences = db.format_for_prompt(household_id=household_id)
+    data = claude.generate_recipe_json(description, preferences=preferences)
+    if not data or not data.get("name"):
+        data = {"name": meal_name, "source": "meal_plan", "tags": []}
+    else:
+        data["source"] = "meal_plan"
+    data.setdefault("name", meal_name)
+    recipe = db.save_recipe(household_id, data)
+    return RedirectResponse(url=f"/recipes/{recipe['id']}", status_code=303)
+
+
+@app.delete("/recipes/{recipe_id}")
+async def recipe_delete(request: Request, recipe_id: int):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+    db.delete_recipe(recipe_id, household_id)
+    return HTMLResponse("", status_code=200)
+
+
+@app.post("/recipes/{recipe_id}/rate", response_class=HTMLResponse)
+async def recipe_rate(
+    request: Request,
+    recipe_id: int,
+    rating: int = Form(...),
+    notes: str = Form(""),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+    db.rate_recipe(recipe_id, rating, notes=notes or None)
+    # Return updated stars HTML snippet
+    stars_html = "".join("★" if i < rating else "☆" for i in range(5))
+    return HTMLResponse(
+        f'<span class="text-yellow-500 text-2xl">{stars_html}</span>'
+        f'<span class="text-green-600 text-sm ml-2">Saved!</span>'
+    )
+
+
+@app.post("/recipes/{recipe_id}/notes", response_class=HTMLResponse)
+async def recipe_save_notes(
+    request: Request,
+    recipe_id: int,
+    notes: str = Form(""),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+    db.update_recipe(recipe_id, household_id, {"notes": notes})
+    return HTMLResponse('<span class="text-green-600 text-sm">Saved</span>')
+
+
+@app.post("/recipes/{recipe_id}/tags", response_class=HTMLResponse)
+async def recipe_add_tag(
+    request: Request,
+    recipe_id: int,
+    tag: str = Form(...),
+    action: str = Form("add"),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipe = db.get_recipe(recipe_id, household_id)
+    if not recipe:
+        return HTMLResponse("", status_code=404)
+
+    tags = list(recipe.get("tags") or [])
+    tag = tag.strip().lower()
+    if action == "remove":
+        tags = [t for t in tags if t != tag]
+    elif tag and tag not in tags:
+        tags.append(tag)
+
+    db.update_recipe(recipe_id, household_id, {"tags": tags})
+    # Return updated tags HTML
+    chips = "".join(
+        f'<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 '
+        f'text-xs rounded-full">{escape(t)}'
+        f'<button hx-post="/recipes/{recipe_id}/tags" hx-vals=\'{{"tag":"{t}","action":"remove"}}\' '
+        f'hx-target="#recipe-tags" hx-swap="outerHTML" class="hover:text-red-600">&times;</button>'
+        f'</span>'
+        for t in tags
+    )
+    return HTMLResponse(
+        f'<div id="recipe-tags" class="flex flex-wrap gap-2">{chips}'
+        f'<form hx-post="/recipes/{recipe_id}/tags" hx-target="#recipe-tags" hx-swap="outerHTML" class="inline-flex">'
+        f'<input name="tag" placeholder="add tag..." class="border rounded px-2 py-0.5 text-xs w-24">'
+        f'<input type="hidden" name="action" value="add">'
+        f'<button class="ml-1 text-xs text-green-700 hover:underline">+</button></form></div>'
+    )
+
+
+@app.post("/recipes/{recipe_id}/add-to-shopping-list", response_class=HTMLResponse)
+async def recipe_add_to_shopping_list(request: Request, recipe_id: int):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipe = db.get_recipe(recipe_id, household_id)
+    if not recipe:
+        return HTMLResponse("Recipe not found", status_code=404)
+
+    active_list = db.get_active_shopping_list(household_id)
+    if not active_list:
+        list_id = db.create_shopping_list("Shopping List", household_id)
+    else:
+        list_id = active_list["id"]
+
+    ingredients = recipe.get("ingredients") or []
+    for ing in ingredients:
+        name = ing.get("name", "")
+        qty_parts = [ing.get("quantity", ""), ing.get("unit", "")]
+        quantity = " ".join(p for p in qty_parts if p).strip() or "1"
+        if name:
+            db.add_shopping_list_item(
+                list_id, name, quantity=quantity, source="recipe", source_id=str(recipe_id)
+            )
+
+    count = len([i for i in ingredients if i.get("name")])
+    return HTMLResponse(
+        f'<span class="text-green-700 font-medium">✅ {count} ingredients added to shopping list</span>'
+    )
+
+
+# Per-recipe AI sidebar chat
+
+@app.post("/recipes/{recipe_id}/chat/start", response_class=HTMLResponse)
+async def recipe_chat_start(request: Request, recipe_id: int):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    recipe = db.get_recipe(recipe_id, household_id)
+    session_key = f"{user['id']}_{recipe_id}"
+    recipe_chat_sessions[session_key] = {
+        "recipe_id": recipe_id,
+        "recipe": recipe,
+        "messages": [],
+    }
+
+    name = escape(recipe.get("name", "this recipe")) if recipe else "this recipe"
+    return templates.TemplateResponse("partials/recipe_chat_message.html", {
+        "request": request,
+        "role": "assistant",
+        "content": (
+            f"Hi! I know **{name}** inside and out. Ask me anything — "
+            "variations, ingredient substitutions, scaling for more or fewer people, "
+            "wine pairings, or how to prep ahead."
+        ),
+        "session_key": session_key,
+        "recipe_id": recipe_id,
+    })
+
+
+@app.post("/recipes/{recipe_id}/chat/message", response_class=HTMLResponse)
+async def recipe_chat_message(
+    request: Request,
+    recipe_id: int,
+    message: str = Form(...),
+    session_key: str = Form(...),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    session = recipe_chat_sessions.get(session_key)
+    if not session:
+        recipe = db.get_recipe(recipe_id, household_id)
+        session = {"recipe_id": recipe_id, "recipe": recipe, "messages": []}
+        recipe_chat_sessions[session_key] = session
+
+    session["messages"].append({"role": "user", "content": message})
+
+    reply = claude.chat_recipe_message(
+        messages=session["messages"],
+        recipe_context=session.get("recipe"),
+    )
+    session["messages"].append({"role": "assistant", "content": reply})
+
+    reply_html = markdown.markdown(reply, extensions=["extra"])
+    return templates.TemplateResponse("partials/recipe_chat_message.html", {
+        "request": request,
+        "role": "assistant",
+        "content_html": reply_html,
+        "session_key": session_key,
+        "recipe_id": recipe_id,
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

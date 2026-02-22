@@ -1,0 +1,50 @@
+<!-- partials/recipe_card.html — used in /recipes grid and HTMX search results -->
+<a href="/recipes/{{ recipe.id }}"
+   class="block bg-white rounded-xl shadow hover:shadow-md transition border border-gray-100 overflow-hidden group">
+
+    <!-- Header bar: source icon + cook time -->
+    <div class="flex items-center justify-between px-4 pt-4 pb-2">
+        <span class="text-xs text-gray-400 font-medium">
+            {% if recipe.source == 'ai_generated' %}🤖 AI Generated
+            {% elif recipe.source == 'meal_plan' %}📋 From Plan
+            {% elif recipe.source == 'web_import' %}🌐 Web Import
+            {% else %}✏️ Manual{% endif %}
+        </span>
+        {% if recipe.cook_time_minutes %}
+        <span class="text-xs text-gray-500">⏱ {{ recipe.cook_time_minutes }} min</span>
+        {% endif %}
+    </div>
+
+    <!-- Name -->
+    <div class="px-4 pb-2">
+        <h3 class="text-lg font-semibold text-gray-800 group-hover:text-green-700 transition leading-snug">
+            {{ recipe.name }}
+        </h3>
+    </div>
+
+    <!-- Description -->
+    {% if recipe.description %}
+    <div class="px-4 pb-3">
+        <p class="text-sm text-gray-500 line-clamp-2">{{ recipe.description }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Footer: tags + rating -->
+    <div class="px-4 pb-4 flex items-end justify-between gap-2">
+        <div class="flex flex-wrap gap-1">
+            {% for tag in (recipe.tags or [])[:3] %}
+            <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full border border-green-200">
+                {{ tag }}
+            </span>
+            {% endfor %}
+            {% if (recipe.tags or [])|length > 3 %}
+            <span class="text-xs text-gray-400">+{{ (recipe.tags|length) - 3 }}</span>
+            {% endif %}
+        </div>
+        {% if recipe.rating %}
+        <span class="text-yellow-400 text-sm flex-shrink-0">
+            {% for i in range(recipe.rating) %}★{% endfor %}{% for i in range(5 - recipe.rating) %}☆{% endfor %}
+        </span>
+        {% endif %}
+    </div>
+</a>
