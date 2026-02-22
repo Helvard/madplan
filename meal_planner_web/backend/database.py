@@ -18,7 +18,10 @@ _key = os.environ.get("SUPABASE_KEY")
 if not _url or not _key:
     raise RuntimeError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
 
-_client: Client = create_client(_url, _key)
+# Prefer the service role key for DB operations so RLS doesn't block server-side queries.
+# Falls back to the anon key if SUPABASE_SERVICE_KEY is not set.
+_service_key = os.environ.get("SUPABASE_SERVICE_KEY") or _key
+_client: Client = create_client(_url, _service_key)
 
 # Default preferences structure — used when no row exists yet
 DEFAULT_PREFERENCES = {
