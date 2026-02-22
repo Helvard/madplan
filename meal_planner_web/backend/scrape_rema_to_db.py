@@ -30,7 +30,9 @@ _key = os.environ.get("SUPABASE_KEY")
 if not _url or not _key:
     raise RuntimeError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
 
-_client: Client = create_client(_url, _key)
+# Use service role key for writes (bypasses RLS); fall back to anon key if not set
+_write_key = os.environ.get("SUPABASE_SERVICE_KEY") or _key
+_client: Client = create_client(_url, _write_key)
 
 
 def _format_price(price: float) -> str:

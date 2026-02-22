@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -29,6 +30,7 @@ from reportlab.lib.units import mm
 from database import Database
 from claude_client import ClaudeClient
 from scraper import load_offers_from_db, format_offers_for_claude
+from scrape_rema_to_db import fetch_offers, sync_offers
 from auth import get_current_user, login_redirect
 
 app = FastAPI(title="Meal Planner")
@@ -1220,6 +1222,22 @@ async def reset_preferences(request: Request):
     _, household_id = _require_auth(request)
     db.reset_preferences_to_defaults(household_id=household_id)
     return HTMLResponse("OK")
+
+
+@app.post("/admin/scrape-offers", response_class=HTMLResponse)
+async def manual_scrape_offers(request: Request):
+    """Manually trigger a Rema 1000 offers sync."""
+    _require_auth(request)
+    try:
+        offers = await asyncio.to_thread(fetch_offers, 500)
+        inserted = await asyncio.to_thread(sync_offers, offers)
+        return HTMLResponse(
+            f'<span class="text-green-700 font-medium">Synced {inserted} offers successfully.</span>'
+        )
+    except Exception as e:
+        return HTMLResponse(
+            f'<span class="text-red-600 font-medium">Error: {escape(str(e))}</span>'
+        )
 
 
 # Preference chat sessions (separate from meal planning sessions)

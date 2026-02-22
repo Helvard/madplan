@@ -12,3 +12,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  scraper:
+    build: .
+    container_name: madplan-scraper
+    restart: unless-stopped
+    env_file: .env
+    # Run only on Thursdays (3) and Sundays (6); check once per day
+    entrypoint: ["/bin/sh", "-c", "while true; do python -c 'import datetime,sys; sys.exit(0 if datetime.datetime.now().weekday() in (3,6) else 1)' && python /app/meal_planner_web/backend/scrape_rema_to_db.py; sleep 86400; done"]

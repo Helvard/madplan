@@ -49,7 +49,20 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="mt-6">
+            <div class="mt-6 space-y-3">
+                <div class="flex items-center gap-3">
+                    <button
+                        hx-post="/admin/scrape-offers"
+                        hx-target="#scrape-result"
+                        hx-swap="innerHTML"
+                        hx-indicator="#scrape-spinner"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
+                    >
+                        Sync Offers Now
+                    </button>
+                    <span id="scrape-spinner" class="htmx-indicator text-gray-500 text-sm">Syncing...</span>
+                    <span id="scrape-result" class="text-sm"></span>
+                </div>
                 <button
                     hx-post="/preferences/reset"
                     hx-confirm="Are you sure you want to reset to default preferences?"
