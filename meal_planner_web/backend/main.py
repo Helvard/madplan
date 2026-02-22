@@ -36,7 +36,14 @@ app = FastAPI(title="Meal Planner")
 _session_secret = os.environ.get("SESSION_SECRET")
 if not _session_secret:
     raise RuntimeError("SESSION_SECRET environment variable is not set")
-app.add_middleware(SessionMiddleware, secret_key=_session_secret)
+# HTTPS_ONLY=true adds the Secure flag to the session cookie — required when behind nginx TLS
+_https_only = os.environ.get("HTTPS_ONLY", "false").lower() == "true"
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_session_secret,
+    https_only=_https_only,
+    same_site="lax",
+)
 
 # Setup paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -632,6 +639,17 @@ async def generate_plan(request: Request, session_id: str = Form(...)):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/debug-session")
+async def debug_session(request: Request):
+    """Temporary: returns current session state to diagnose cookie issues."""
+    return {
+        "has_access_token": bool(request.session.get("access_token")),
+        "user": request.session.get("user"),
+        "household_id": request.session.get("household_id"),
+        "cookie_names": list(request.cookies.keys()),
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
