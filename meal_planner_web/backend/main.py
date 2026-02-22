@@ -113,11 +113,18 @@ async def login_post(
     user_email = data["user"]["email"]
 
     # Get or create user_profile + household_id
-    profile = db.get_user_profile(user_id)
-    if not profile:
-        profile = db.create_user_profile(user_id, user_email)
-
-    household_id = profile.get("household_id")
+    # Wrapped in try/except so a DB failure shows a clear error instead of a silent loop
+    household_id = None
+    try:
+        profile = db.get_user_profile(user_id)
+        if not profile:
+            profile = db.create_user_profile(user_id, user_email)
+        if profile:
+            household_id = profile.get("household_id")
+    except Exception as e:
+        print(f"[login] DB error fetching profile for {user_email}: {e}")
+        # Auth succeeded but DB failed — still log the user in, they can set up household later
+        household_id = None
 
     request.session["access_token"] = access_token
     request.session["user"] = {"id": user_id, "email": user_email, "household_id": household_id}
@@ -193,8 +200,13 @@ async def household_page(request: Request):
     if not user:
         return login_redirect()
     household_id = user.get("household_id")
-    household = db.get_household(household_id) if household_id else None
-    members = db.get_household_members(household_id) if household_id else []
+    try:
+        household = db.get_household(household_id) if household_id else None
+        members = db.get_household_members(household_id) if household_id else []
+    except Exception as e:
+        print(f"[household] DB error: {e}")
+        household = None
+        members = []
     return templates.TemplateResponse("household.html", {
         "request": request,
         "user": user,
