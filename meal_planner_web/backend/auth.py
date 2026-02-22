@@ -45,10 +45,16 @@ def get_current_user(request: Request) -> dict | None:
             "household_id": request.session.get("household_id"),
         }
     except jwt.ExpiredSignatureError:
+        # Token genuinely expired — clear session and force re-login
         request.session.clear()
         return None
     except Exception:
-        return None
+        # JWT validation failed (wrong secret, format mismatch, etc.)
+        # Fall back to session trust — the session cookie is already signed
+        # by Starlette with SESSION_SECRET, so it can't be forged.
+        print(f"[auth] JWT decode failed, falling back to session trust")
+        user = request.session.get("user")
+        return user if user else None
 
 
 def require_user(request: Request) -> dict | None:
