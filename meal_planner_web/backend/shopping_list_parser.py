@@ -25,10 +25,13 @@ class ShoppingListParser:
         """
         items = []
         
-        # Find the Shopping List section
+        # Find the Shopping List section.
+        # NOTE: lookahead must be '\n## ' not '##' — otherwise '### Category'
+        # headers (which start with '##') cause the non-greedy '.*?' to match
+        # zero characters, returning an empty section every time.
         shopping_list_match = re.search(
-            r'## Shopping List\s*(.*?)(?=##|$)', 
-            meal_plan_text, 
+            r'## Shopping List\s*(.*?)(?=\n## |\Z)',
+            meal_plan_text,
             re.DOTALL | re.IGNORECASE
         )
         
