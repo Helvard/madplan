@@ -1,5 +1,4 @@
-<!-- Updated Meal plan display partial - partials/meal_plan.html -->
-<!-- Replace existing meal_plan.html with this version -->
+<!-- Meal plan display partial - partials/meal_plan.html -->
 
 <div class="flex items-start gap-3">
     <div class="flex-shrink-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">
@@ -10,7 +9,7 @@
             <!-- Render meal plan as markdown -->
             {{ meal_plan | safe }}
         </div>
-        
+
         <div class="mt-6 pt-4 border-t border-green-200">
             <!-- Action Buttons -->
             <div class="flex flex-wrap gap-3 mb-3">
@@ -18,19 +17,19 @@
                     onclick="showShoppingListPrompt('{{ session_id }}')"
                     class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-semibold"
                 >
-                    ✅ Accept Plan
+                    ✅ Godkend madplan
                 </button>
                 <button
                     onclick="document.getElementById('feedback-input-{{ session_id }}').classList.remove('hidden'); this.style.display='none';"
                     class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
                 >
-                    🔄 Request Changes
+                    🔄 Foreslå ændringer
                 </button>
                 <button
                     onclick="document.getElementById('save-recipe-input-{{ session_id }}').classList.remove('hidden'); this.style.display='none';"
                     class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition"
                 >
-                    📖 Save a Recipe
+                    📖 Gem en opskrift
                 </button>
             </div>
 
@@ -41,33 +40,34 @@
                     <input
                         type="text"
                         name="meal_name"
-                        placeholder="Which meal? e.g. Monday's salmon pasta"
+                        placeholder="Hvilken ret? f.eks. Mandag laksepasta"
                         class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm"
                         required
                     >
                     <button
                         type="submit"
                         class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
-                    >Save Recipe</button>
+                    >Gem opskrift</button>
                 </form>
-                <p class="text-xs text-gray-400 mt-1">Claude will generate the full recipe — ingredients, instructions, tips.</p>
+                <p class="text-xs text-gray-400 mt-1">Claude genererer den fulde opskrift — ingredienser, fremgangsmåde og tips.</p>
             </div>
-            
+
             <!-- Shopping List Prompt (Hidden initially) -->
+            <!-- The entire prompt div is swapped out by the "Yes" button response (outerHTML) -->
             <div id="shopping-list-prompt-{{ session_id }}" class="hidden mb-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="font-semibold mb-3">📝 Add ingredients to shopping list?</p>
-                <div class="flex gap-3">
-                    <button 
+                <p class="font-semibold mb-3">📝 Vil du tilføje ingredienser til indkøbslisten?</p>
+                <div class="flex flex-wrap gap-3 items-center">
+                    <button
                         hx-post="/shopping-list/add-from-meal-plan"
                         hx-vals='{"session_id": "{{ session_id }}", "meal_plan": {{ meal_plan_raw|tojson }}}'
-                        hx-target="#chat-messages"
-                        hx-swap="beforeend"
-                        onclick="acceptPlanFinal('{{ session_id }}')"
-                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+                        hx-target="#shopping-list-prompt-{{ session_id }}"
+                        hx-swap="outerHTML"
+                        hx-disabled-elt="this"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
                     >
-                        Yes, Add to Shopping List
+                        Ja, tilføj til indkøbslisten
                     </button>
-                    <button 
+                    <button
                         hx-post="/chat/accept-plan"
                         hx-vals='{"session_id": "{{ session_id }}"}'
                         hx-target="#chat-messages"
@@ -75,28 +75,29 @@
                         onclick="acceptPlanFinal('{{ session_id }}')"
                         class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition"
                     >
-                        No, Just Save Plan
+                        Nej, gem kun madplanen
                     </button>
+                    <span class="htmx-indicator text-gray-500 text-sm">⏳ Tilføjer varer...</span>
                 </div>
             </div>
-            
+
             <!-- Hidden feedback input -->
             <div id="feedback-input-{{ session_id }}" class="hidden">
-                <form 
+                <form
                     hx-post="/chat/refine-plan"
                     hx-target="#chat-messages"
                     hx-swap="beforeend"
                     class="flex gap-2"
                 >
                     <input type="hidden" name="session_id" value="{{ session_id }}">
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         name="feedback"
-                        placeholder="What would you like to change? (e.g., 'replace Day 3 with something easier')"
+                        placeholder="Hvad vil du ændre? (f.eks. 'byt dag 3 ud med noget nemmere')"
                         class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
                         required
                     >
-                    <button 
+                    <button
                         type="submit"
                         class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                     >

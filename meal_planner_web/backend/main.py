@@ -1825,39 +1825,60 @@ async def add_from_meal_plan_endpoint(
     try:
         _, household_id = _require_auth(request)
         active_list = db.get_active_shopping_list(household_id=household_id)
-        
+
+        # Auto-create a shopping list if none exists (user may not have visited the page yet)
         if not active_list:
-            return HTMLResponse("Error: No active shopping list", status_code=400)
-        
+            list_id = db.create_shopping_list(
+                f"Indkøbsliste {datetime.now().strftime('%Y-%m-%d')}", household_id=household_id
+            )
+            active_list = {"id": list_id}
+
         # Parse shopping list from meal plan
         parser = ShoppingListParser()
         items = parser.parse_shopping_list(meal_plan)
-        
+
+        print(f"[add_from_meal_plan] Parsed {len(items)} items from meal plan ({len(meal_plan)} chars)")
+
         if not items:
             return HTMLResponse(
                 """<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-                    ⚠️ Could not extract shopping list from meal plan.
+                    ⚠️ Kunne ikke udtrække indkøbsliste fra madplanen. Gå til <a href="/shopping-list" class="underline">indkøbslisten</a> for at tilføje varer manuelt.
                 </div>""",
                 status_code=200
             )
-        
-        # Add items in bulk
-        added_count = db.add_shopping_list_items_bulk(active_list['id'], items)
-        
+
+        # Add items one by one so duplicate merging logic runs correctly
+        added_count = 0
+        for item in items:
+            db.add_shopping_list_item(
+                list_id=active_list["id"],
+                item_name=item["item_name"],
+                quantity=item.get("quantity"),
+                category=item.get("category"),
+                source="meal_plan",
+                price_estimate=item.get("price_estimate"),
+            )
+            added_count += 1
+
         # Return success message
         return HTMLResponse(
             f"""<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                ✅ Added {added_count} items to your shopping list!
-                <a href="/shopping-list" class="underline ml-2">View Shopping List</a>
+                ✅ {added_count} varer tilføjet til din indkøbsliste!
+                <a href="/shopping-list" class="underline ml-2">Se indkøbsliste →</a>
             </div>""",
             status_code=200
         )
-    
+
     except Exception as e:
         print(f"Error adding from meal plan: {e}")
         import traceback
         traceback.print_exc()
-        return HTMLResponse(f"Error: {str(e)}", status_code=500)
+        return HTMLResponse(
+            f"""<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                ❌ Fejl: {str(e)}
+            </div>""",
+            status_code=500
+        )
 
 
 # ---------------------------------------------------------------------------
