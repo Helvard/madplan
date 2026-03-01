@@ -37,18 +37,20 @@
 
     <!-- Shopping List Items -->
     <div id="shopping-list-items">
-        {% include 'partials/shopping_list_items_partial.html' %}
+        {% include 'partials/shopping_list_items.html' %}
     </div>
 
     <!-- Action Buttons -->
     <div class="mt-6 flex gap-3">
-        <form method="post" action="/shopping-list/clear-checked" style="display: inline;">
+        <form method="post" action="/shopping-list/clear" style="display: inline;">
+            <input type="hidden" name="clear_type" value="checked">
             <button type="submit" onclick="return confirm('Remove all checked items?')"
                 class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
                 Clear Checked Items
             </button>
         </form>
-        <form method="post" action="/shopping-list/clear-all" style="display: inline;">
+        <form method="post" action="/shopping-list/clear" style="display: inline;">
+            <input type="hidden" name="clear_type" value="all">
             <button type="submit" onclick="return confirm('Remove ALL items?')"
                 class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
                 Clear All Items

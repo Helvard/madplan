@@ -342,20 +342,6 @@ async def get_shopping_list_stats(request: Request):
     })
 
 
-@app.delete("/shopping-list/item/{item_id}", response_class=HTMLResponse)
-async def remove_shopping_list_item_endpoint(item_id: int):
-    """Remove an item from shopping list."""
-    db = Database()
-    db.remove_shopping_list_item(item_id)
-    
-    return """
-    <script>
-        document.body.dispatchEvent(new Event('item-removed'));
-    </script>
-    """
-
-
-
 @app.get("/shopping-list/export-pdf")
 async def export_shopping_list_pdf():
     """Export shopping list as PDF."""
