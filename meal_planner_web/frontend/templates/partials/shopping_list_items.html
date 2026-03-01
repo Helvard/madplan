@@ -2,30 +2,30 @@
 {% if items and items|length > 0 %}
     {% set items_by_category = {} %}
     {% for item in items %}
-        {% set cat = item.category or 'Other' %}
+        {% set cat = item.category or 'Andet' %}
         {% if cat not in items_by_category %}
             {% set _ = items_by_category.update({cat: []}) %}
         {% endif %}
         {% set _ = items_by_category[cat].append(item) %}
     {% endfor %}
-    
+
     <!-- Show all categories that have items -->
     {% for category, cat_items in items_by_category.items() %}
         <div class="bg-white rounded-lg shadow mb-4">
             <div class="bg-gray-100 px-4 py-3 border-b border-gray-200">
                 <h3 class="font-semibold text-gray-900">
-                    {% if category == 'Produce' %}🥬
-                    {% elif category == 'Dairy' %}🥛
-                    {% elif category in ['Meat', 'Meat & Fish'] %}🥩
-                    {% elif category == 'Pantry' %}🥫
-                    {% elif category == 'Bakery' %}🍞
-                    {% elif category == 'Frozen' %}🧊
-                    {% elif category == 'Beverages' %}🥤
+                    {% if category in ['Produce', 'Grøntsager'] %}🥬
+                    {% elif category in ['Dairy', 'Mejeri'] %}🥛
+                    {% elif category in ['Meat', 'Meat & Fish', 'Kød & Fisk'] %}🥩
+                    {% elif category in ['Pantry', 'Tørvarer'] %}🥫
+                    {% elif category in ['Bakery', 'Bageri'] %}🍞
+                    {% elif category in ['Frozen', 'Frost'] %}🧊
+                    {% elif category in ['Beverages', 'Drikkevarer'] %}🥤
                     {% else %}📦
                     {% endif %}
                     {{ category }}
                     <span class="text-sm text-gray-600 font-normal ml-2">
-                        ({{ cat_items|length }} items)
+                        ({{ cat_items|length }} varer)
                     </span>
                 </h3>
             </div>
@@ -35,13 +35,13 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3 flex-1">
                             <!-- Checkbox -->
-                            <input type="checkbox" 
+                            <input type="checkbox"
                                    {% if item.checked %}checked{% endif %}
                                    hx-post="/shopping-list/toggle/{{ item.id }}"
                                    hx-target="closest div.px-4"
                                    hx-swap="outerHTML"
                                    class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer">
-                            
+
                             <!-- Item Details -->
                             <div class="flex-1 {% if item.checked %}line-through text-gray-500{% endif %}">
                                 <span class="font-medium">{{ item.item_name }}</span>
@@ -55,21 +55,25 @@
                                 {% endif %}
                                 {% if item.source == 'offer' %}
                                 <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
-                                    From offer
+                                    Fra tilbud
                                 </span>
                                 {% elif item.source == 'meal_plan' %}
                                 <span class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
-                                    From meal plan
+                                    Fra madplan
+                                </span>
+                                {% elif item.source == 'staple' %}
+                                <span class="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                                    Fast vare
                                 </span>
                                 {% endif %}
                             </div>
                         </div>
-                        
+
                         <!-- Remove Button -->
                         <button hx-delete="/shopping-list/item/{{ item.id }}"
                                 hx-target="closest div.px-4"
                                 hx-swap="outerHTML swap:200ms"
-                                hx-confirm="Remove this item?"
+                                hx-confirm="Fjern denne vare?"
                                 class="text-red-600 hover:text-red-800 transition px-2 py-1">
                             🗑️
                         </button>
@@ -81,8 +85,8 @@
     {% endfor %}
 {% else %}
     <div class='text-center py-8 text-gray-500'>
-        <p class='text-lg font-medium mb-2'>No items in shopping list</p>
-        <p class='text-sm'>Add items using the form above</p>
+        <p class='text-lg font-medium mb-2'>Ingen varer i indkøbslisten</p>
+        <p class='text-sm'>Tilføj varer via formularen ovenfor</p>
     </div>
 {% endif %}
 

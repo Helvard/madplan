@@ -1,0 +1,58 @@
+<!-- Staples panel — included in shopping_list.html and returned by HTMX routes -->
+<!-- All HTMX actions target #staples-panel so the whole panel refreshes -->
+
+<div id="staples-panel">
+    {% if staples %}
+    <form method="post" action="/shopping-list/staples/add-to-list" id="staples-form">
+        <div class="space-y-2 mb-4">
+            {% for staple in staples %}
+            <div class="flex items-center justify-between py-2 px-1 border-b border-gray-100 last:border-0">
+                <label class="flex items-center gap-3 flex-1 cursor-pointer">
+                    <input type="checkbox" name="staple_{{ staple.id }}" value="on"
+                           class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                    <span class="text-sm font-medium text-gray-800">{{ staple.item_name }}</span>
+                    {% if staple.quantity %}
+                    <span class="text-xs text-gray-500">{{ staple.quantity }}</span>
+                    {% endif %}
+                    {% if staple.times_added > 0 %}
+                    <span class="text-xs text-gray-400 ml-1" title="Tilføjet {{ staple.times_added }} gange">
+                        ×{{ staple.times_added }}
+                    </span>
+                    {% endif %}
+                </label>
+                <button type="button"
+                        hx-delete="/shopping-list/staples/{{ staple.id }}"
+                        hx-target="#staples-panel"
+                        hx-swap="outerHTML"
+                        class="text-red-400 hover:text-red-600 transition px-2 text-sm"
+                        title="Fjern fast vare">
+                    ✕
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit"
+                class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm font-medium">
+            Tilføj valgte til indkøbsliste
+        </button>
+    </form>
+    {% else %}
+    <p class="text-sm text-gray-500 text-center py-4">Ingen faste varer endnu.</p>
+    {% endif %}
+
+    <!-- Add new staple form -->
+    <form hx-post="/shopping-list/staples/create"
+          hx-target="#staples-panel"
+          hx-swap="outerHTML"
+          class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+        <input type="text" name="item_name" placeholder="Fx mælk, rugbrød, æg…"
+               class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+               required>
+        <input type="text" name="quantity" placeholder="Antal"
+               class="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+        <button type="submit"
+                class="bg-green-600 text-white px-4 py-1.5 rounded-lg hover:bg-green-700 transition text-sm">
+            + Tilføj
+        </button>
+    </form>
+</div>

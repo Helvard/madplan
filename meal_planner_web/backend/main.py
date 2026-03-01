@@ -730,10 +730,12 @@ async def rate_meals_page(request: Request):
     """Show page to rate unrated meals."""
     user, household_id = _require_auth(request)
     unrated = db.get_unrated_meals(household_id=household_id)
+    members = db.get_member_preferences(household_id) if household_id else []
     return templates.TemplateResponse("rate_meals.html", {
         "request": request,
         "user": user,
-        "unrated_meals": unrated
+        "unrated_meals": unrated,
+        "members": members,
     })
 
 
@@ -741,7 +743,10 @@ async def rate_meals_page(request: Request):
 async def submit_ratings(request: Request):
     """Submit meal ratings."""
     from fastapi.responses import RedirectResponse
-    
+
+    user, household_id = _require_auth(request)
+    members = db.get_member_preferences(household_id) if household_id else []
+
     form_data = await request.form()
     meal_count = int(form_data.get('meal_count', 0))
     
@@ -779,6 +784,23 @@ async def submit_ratings(request: Request):
                 )
                 rated_count += 1
                 print(f"  ✅ Saved successfully")
+
+                # Stage C: collect member feedback and save pref hits
+                if members:
+                    meal_name = form_data.get(f'meal_name_{i}', '')
+                    liked_hits, disliked_hits = [], []
+                    for member in members:
+                        key = f'member_feedback_{i}_{member["id"]}'
+                        feedback = form_data.get(key, 'neutral')
+                        if feedback == 'liked':
+                            liked_hits.append(f"{member['display_name']}: {meal_name}")
+                        elif feedback == 'disliked':
+                            disliked_hits.append(f"{member['display_name']}: {meal_name}")
+                    if liked_hits or disliked_hits:
+                        db.save_member_pref_hits(
+                            int(meal_id),
+                            {"liked_hits": liked_hits, "disliked_hits": disliked_hits}
+                        )
             except Exception as e:
                 print(f"  ❌ Error: {e}")
                 import traceback
@@ -1154,11 +1176,18 @@ def categorize_item(item_name: str, department: Optional[str] = None) -> str:
 async def preferences_page(request: Request):
     """Show preferences management page."""
     user, household_id = _require_auth(request)
+    if not user:
+        return RedirectResponse("/login", 303)
     preferences = db.load_preferences(household_id=household_id)
+    members = db.get_member_preferences(household_id) if household_id else []
+    user_member = db.get_member_profile_for_user(user["id"]) if user else None
     return templates.TemplateResponse("preferences.html", {
         "request": request,
         "user": user,
-        "preferences": preferences
+        "current_page": "preferences",
+        "preferences": preferences,
+        "members": members,
+        "user_member": user_member,
     })
 
 
@@ -1168,6 +1197,80 @@ async def reset_preferences(request: Request):
     _, household_id = _require_auth(request)
     db.reset_preferences_to_defaults(household_id=household_id)
     return HTMLResponse("OK")
+
+
+@app.post("/preferences/members/create")
+async def create_member_profile(request: Request):
+    """Add a new family member profile."""
+    user, household_id = _require_auth(request)
+    if not user or not household_id:
+        return RedirectResponse("/login", 303)
+    form = await request.form()
+    display_name = (form.get("display_name") or "").strip()
+    if display_name:
+        db.create_member_profile(household_id, display_name)
+    return RedirectResponse("/preferences#members", 303)
+
+
+@app.post("/preferences/members/{member_id}/update")
+async def update_member_profile(request: Request, member_id: int):
+    """Update a member's likes/dislikes. Household owner or the member themselves."""
+    user, household_id = _require_auth(request)
+    if not user or not household_id:
+        return RedirectResponse("/login", 303)
+
+    # Auth: owner OR the member linked to this user
+    member = db.update_member_preferences(member_id, household_id, {})  # fetch via no-op
+    user_member = db.get_member_profile_for_user(user["id"])
+    is_own_profile = user_member and user_member["id"] == member_id and user_member.get("can_self_edit")
+    # If not owner and not own profile, reject (we don't have owner_id yet so we allow any household member)
+
+    form = await request.form()
+
+    def _tags(field: str):
+        raw = form.get(field, "")
+        return [t.strip() for t in raw.split(",") if t.strip()]
+
+    updates = {
+        "display_name": (form.get("display_name") or "").strip() or None,
+        "liked_meals": _tags("liked_meals"),
+        "disliked_meals": _tags("disliked_meals"),
+        "liked_ingredients": _tags("liked_ingredients"),
+        "disliked_ingredients": _tags("disliked_ingredients"),
+    }
+    updates = {k: v for k, v in updates.items() if v is not None}
+    db.update_member_preferences(member_id, household_id, updates)
+    return RedirectResponse("/preferences#members", 303)
+
+
+@app.post("/preferences/members/{member_id}/delete")
+async def delete_member_profile(request: Request, member_id: int):
+    """Delete a family member profile."""
+    user, household_id = _require_auth(request)
+    if not user or not household_id:
+        return RedirectResponse("/login", 303)
+    db.delete_member_profile(member_id, household_id)
+    return RedirectResponse("/preferences#members", 303)
+
+
+@app.get("/preferences/me")
+async def my_preferences_page(request: Request):
+    """Show the current user's own member profile for self-editing."""
+    user, household_id = _require_auth(request)
+    if not user:
+        return RedirectResponse("/login", 303)
+    user_member = db.get_member_profile_for_user(user["id"])
+    if not user_member or not user_member.get("can_self_edit"):
+        return RedirectResponse("/preferences", 303)
+    return templates.TemplateResponse("preferences.html", {
+        "request": request,
+        "user": user,
+        "current_page": "preferences",
+        "preferences": db.load_preferences(household_id=household_id),
+        "members": db.get_member_preferences(household_id) if household_id else [],
+        "user_member": user_member,
+        "scroll_to_member": user_member["id"],
+    })
 
 
 @app.post("/admin/scrape-offers", response_class=HTMLResponse)
@@ -1366,6 +1469,28 @@ def build_claude_prompt(offers_text: str, preferences: dict, household_id: int =
     # Load meal history for context
     meal_history_text = db.get_meal_history_for_context(weeks_back=4, household_id=household_id)
     
+    # Member preferences (soft guidance for individual family members)
+    member_prefs = db.get_member_preferences(household_id) if household_id else []
+    member_prefs_text = ""
+    if member_prefs:
+        lines = [
+            "# Family Member Preferences",
+            "These are SOFT preferences — do not hard-exclude meals.",
+            "Add a ⚠️ note inline when a meal conflicts with a member's dislike.",
+            "Example: '⚠️ Note: Bertil doesn't like mashed potatoes'",
+        ]
+        for m in member_prefs:
+            lines.append(f"\n**{m['display_name']}**")
+            if m.get("liked_meals"):
+                lines.append(f"  Likes (meals): {', '.join(m['liked_meals'])}")
+            if m.get("disliked_meals"):
+                lines.append(f"  Dislikes (meals): {', '.join(m['disliked_meals'])}")
+            if m.get("liked_ingredients"):
+                lines.append(f"  Likes (ingredients): {', '.join(m['liked_ingredients'])}")
+            if m.get("disliked_ingredients"):
+                lines.append(f"  Dislikes (ingredients): {', '.join(m['disliked_ingredients'])}")
+        member_prefs_text = "\n".join(lines)
+
     prompt_parts = [
         "You are a meal planning assistant. Create a weekly meal plan based on current supermarket offers.",
         "",
@@ -1373,6 +1498,10 @@ def build_claude_prompt(offers_text: str, preferences: dict, household_id: int =
         "",
         meal_history_text,  # Meal history (ratings, recent meals, favorites)
         "",
+    ]
+    if member_prefs_text:
+        prompt_parts += [member_prefs_text, ""]
+    prompt_parts += [
         "# This Week's Parameters",
         f"- Number of dinners: {preferences.get('num_dinners', 7)}",
     ]
@@ -1494,6 +1623,9 @@ async def shopping_list_page(request: Request):
     checked = stats['checked_items']
     progress_percent = (checked / total * 100) if total > 0 else 0
     
+    # Get staples for the staples panel
+    staples = db.get_staples(household_id)
+
     user = get_current_user(request)
     return templates.TemplateResponse("shopping_list.html", {
         "request": request,
@@ -1501,7 +1633,8 @@ async def shopping_list_page(request: Request):
         "shopping_list": shopping_list,
         "items": items,
         "stats": stats,
-        "progress_percent": progress_percent
+        "progress_percent": progress_percent,
+        "staples": staples,
     })
 
 @app.get("/shopping-list/count")
@@ -1725,6 +1858,94 @@ async def add_from_meal_plan_endpoint(
         import traceback
         traceback.print_exc()
         return HTMLResponse(f"Error: {str(e)}", status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# Staples routes
+# ---------------------------------------------------------------------------
+
+@app.get("/shopping-list/staples", response_class=HTMLResponse)
+async def get_staples_partial(request: Request):
+    """Return the staples panel as an HTML partial (HTMX target)."""
+    _, household_id = _require_auth(request)
+    staples = db.get_staples(household_id)
+    return templates.TemplateResponse("partials/staples_panel.html", {
+        "request": request,
+        "staples": staples,
+    })
+
+
+@app.post("/shopping-list/staples/create", response_class=HTMLResponse)
+async def create_staple_endpoint(
+    request: Request,
+    item_name: str = Form(...),
+    quantity: str = Form(None),
+):
+    """Create a new staple item and return the refreshed staples panel."""
+    _, household_id = _require_auth(request)
+    if item_name.strip():
+        db.create_staple(household_id, item_name.strip(), quantity=quantity or None)
+    staples = db.get_staples(household_id)
+    return templates.TemplateResponse("partials/staples_panel.html", {
+        "request": request,
+        "staples": staples,
+    })
+
+
+@app.delete("/shopping-list/staples/{staple_id}", response_class=HTMLResponse)
+async def delete_staple_endpoint(request: Request, staple_id: int):
+    """Delete a staple item and return the refreshed staples panel."""
+    _, household_id = _require_auth(request)
+    db.delete_staple(staple_id, household_id)
+    staples = db.get_staples(household_id)
+    return templates.TemplateResponse("partials/staples_panel.html", {
+        "request": request,
+        "staples": staples,
+    })
+
+
+@app.post("/shopping-list/staples/add-to-list")
+async def add_staples_to_list_endpoint(request: Request):
+    """Add selected staples to the active shopping list, then redirect."""
+    _, household_id = _require_auth(request)
+    form_data = await request.form()
+
+    # Collect checked staple IDs from checkboxes named "staple_{id}"
+    staple_ids = [
+        int(k.replace("staple_", ""))
+        for k, v in form_data.items()
+        if k.startswith("staple_") and v == "on"
+    ]
+
+    if staple_ids:
+        # Resolve staple details
+        all_staples = db.get_staples(household_id)
+        staples_map = {s["id"]: s for s in all_staples}
+
+        active_list = db.get_active_shopping_list(household_id=household_id)
+        if not active_list:
+            active_list_id = db.create_shopping_list(
+                f"Indkøbsliste {datetime.now().strftime('%Y-%m-%d')}",
+                household_id=household_id,
+            )
+            active_list = {"id": active_list_id}
+
+        for sid in staple_ids:
+            staple = staples_map.get(sid)
+            if not staple:
+                continue
+            db.add_shopping_list_item(
+                list_id=active_list["id"],
+                item_name=staple["item_name"],
+                quantity=staple.get("quantity"),
+                category=staple.get("category"),
+                source="staple",
+            )
+
+        # Increment usage counters
+        db.increment_staple_usage(staple_ids, household_id)
+
+    return RedirectResponse(url="/shopping-list", status_code=303)
 
 
 @app.get("/shopping-list/export-pdf")

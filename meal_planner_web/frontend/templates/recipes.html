@@ -1,7 +1,7 @@
 {% set current_page = 'recipes' %}
 {% extends 'base.html' %}
 
-{% block title %}Recipes — Family Food Almanac{% endblock %}
+{% block title %}Opskrifter — Familiens madbog{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-6xl">
@@ -9,11 +9,11 @@
     <!-- Page header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h2 class="text-3xl font-bold text-gray-800">📖 Recipes</h2>
-            <p class="text-gray-500 mt-1">Your family's collected food knowledge</p>
+            <h2 class="text-3xl font-bold text-gray-800">📖 Opskrifter</h2>
+            <p class="text-gray-500 mt-1">Familiens samlede madkundskab</p>
         </div>
         <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
-            {{ recipes|length }} saved
+            {{ recipes|length }} gemt
         </span>
     </div>
 
@@ -22,12 +22,12 @@
 
         <!-- Generate with AI -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 class="font-semibold text-gray-700 mb-3">🤖 Generate with AI</h3>
+            <h3 class="font-semibold text-gray-700 mb-3">🤖 Opret med AI</h3>
             <form method="post" action="/recipes/generate" class="flex flex-col gap-2">
                 <input
                     type="text"
                     name="description"
-                    placeholder="e.g. quick pasta that kids love, or creamy fish soup"
+                    placeholder="fx hurtig pasta som børn elsker, eller cremet fiskesuppe"
                     class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                     required
                 >
@@ -35,19 +35,19 @@
                     type="submit"
                     class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-medium"
                 >
-                    Generate Recipe
+                    Generer opskrift
                 </button>
             </form>
         </div>
 
         <!-- Import from URL -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 class="font-semibold text-gray-700 mb-3">🌐 Import from URL</h3>
+            <h3 class="font-semibold text-gray-700 mb-3">🌐 Importer fra URL</h3>
             <form method="post" action="/recipes/import-url" class="flex flex-col gap-2">
                 <input
                     type="url"
                     name="url"
-                    placeholder="https://example.com/recipe/pasta-bake"
+                    placeholder="https://eksempel.dk/opskrift/pasta-gratin"
                     class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                     required
                 >
@@ -55,7 +55,7 @@
                     type="submit"
                     class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                 >
-                    Import Recipe
+                    Importer opskrift
                 </button>
             </form>
         </div>
@@ -67,7 +67,7 @@
             <input
                 type="text"
                 id="search-input"
-                placeholder="Search recipes…"
+                placeholder="Søg i opskrifter…"
                 class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                 hx-get="/recipes/search"
                 hx-trigger="keyup changed delay:300ms"
@@ -82,7 +82,7 @@
                 onclick="filterByTag('')"
                 id="tag-all"
                 class="px-3 py-1 rounded-full text-xs border border-green-500 bg-green-500 text-white font-medium"
-            >All</button>
+            >Alle</button>
             {% for tag in all_tags %}
             <button
                 onclick="filterByTag('{{ tag }}')"
@@ -103,8 +103,8 @@
         {% else %}
         <div class="col-span-full text-center py-16">
             <p class="text-5xl mb-4">🍳</p>
-            <p class="text-gray-500 text-lg mb-2">No recipes saved yet.</p>
-            <p class="text-gray-400 text-sm">Generate one with AI, import from a URL, or save a meal from your plan history.</p>
+            <p class="text-gray-500 text-lg mb-2">Ingen opskrifter gemt endnu.</p>
+            <p class="text-gray-400 text-sm">Generer en med AI, importer fra en URL, eller gem et måltid fra din historik.</p>
         </div>
         {% endif %}
     </div>

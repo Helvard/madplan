@@ -5,13 +5,13 @@
     <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
             <!-- Logo/Title -->
-            <h1 class="text-2xl font-bold">🍽️ Meal Planner</h1>
-            
+            <h1 class="text-2xl font-bold">🍽️ Madplan</h1>
+
             <!-- Main Navigation -->
             <nav class="flex items-center gap-5">
                 <!-- Plan -->
                 <a href="/" class="nav-link {% if current_page == 'plan' %}font-bold underline{% else %}hover:underline{% endif %} relative">
-                    Plan
+                    Planlæg
                     <span id="nav-badge-plan" class="hidden absolute -top-2 -right-3 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                         !
                     </span>
@@ -19,12 +19,12 @@
 
                 <!-- Offers -->
                 <a href="/offers" class="nav-link {% if current_page == 'offers' %}font-bold underline{% else %}hover:underline{% endif %}">
-                    Offers
+                    Tilbud
                 </a>
 
                 <!-- Shopping List -->
                 <a href="/shopping-list" class="nav-link {% if current_page == 'shopping-list' %}font-bold underline{% else %}hover:underline{% endif %} relative">
-                    Shopping List
+                    Indkøbsliste
                     <span id="nav-badge-shopping" class="hidden absolute -top-2 -right-3 bg-orange-400 text-orange-900 text-xs font-bold rounded-full px-2 py-0.5">
                         0
                     </span>
@@ -32,28 +32,35 @@
 
                 <!-- History -->
                 <a href="/history" class="nav-link {% if current_page == 'history' %}font-bold underline{% else %}hover:underline{% endif %}">
-                    History
+                    Historik
                 </a>
 
                 <!-- Recipes -->
                 <a href="/recipes" class="nav-link {% if current_page == 'recipes' %}font-bold underline{% else %}hover:underline{% endif %}">
-                    Recipes
+                    Opskrifter
                 </a>
 
                 <!-- Preferences -->
                 <a href="/preferences" class="nav-link {% if current_page == 'preferences' %}font-bold underline{% else %}hover:underline{% endif %}">
-                    Preferences
+                    Indstillinger
                 </a>
+
+                <!-- My Profile (only for linked members with self-edit) -->
+                {% if user_member and user_member.can_self_edit %}
+                <a href="/preferences/me" class="nav-link hover:underline text-green-200">
+                    Min profil
+                </a>
+                {% endif %}
 
                 <!-- User / Household -->
                 {% if user %}
                 <div class="flex items-center gap-3 ml-2 pl-4 border-l border-green-500">
-                    <a href="/household" class="text-sm opacity-80 hover:opacity-100" title="Household settings">
+                    <a href="/household" class="text-sm opacity-80 hover:opacity-100" title="Husstandsindstillinger">
                         👤 {{ user.email.split('@')[0] }}
                     </a>
                     <form method="post" action="/logout" class="inline">
                         <button type="submit" class="text-sm opacity-70 hover:opacity-100 hover:underline">
-                            Logout
+                            Log ud
                         </button>
                     </form>
                 </div>
@@ -77,13 +84,13 @@
                 return 0;
             }
         },
-        
+
         // Update all navigation badges
         async updateBadges() {
             // Update shopping list badge
             const shoppingCount = await this.getShoppingListCount();
             const shoppingBadge = document.getElementById('nav-badge-shopping');
-            
+
             if (shoppingCount > 0) {
                 shoppingBadge.textContent = shoppingCount;
                 shoppingBadge.classList.remove('hidden');
@@ -92,17 +99,17 @@
             }
         }
     };
-    
+
     // Update badges on page load
     document.addEventListener('DOMContentLoaded', () => {
         AppState.updateBadges();
     });
-    
+
     // Listen for shopping list updates
     document.body.addEventListener('shopping-list-updated', () => {
         AppState.updateBadges();
     });
-    
+
     // Update periodically (every 30 seconds)
     setInterval(() => {
         AppState.updateBadges();

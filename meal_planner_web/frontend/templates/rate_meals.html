@@ -1,13 +1,13 @@
 {% set current_page = 'history' %}
 {% extends 'base.html' %}
 
-{% block title %}Rate Meals - Meal Planner{% endblock %}
+{% block title %}Bedøm måltider - Madplan{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-4xl">
     <div class="bg-white rounded-lg shadow-lg p-8">
-        <h2 class="text-3xl font-bold text-gray-800 mb-2">⭐ Rate Your Meals</h2>
-        <p class="text-gray-600 mb-8">Help improve future meal plans by rating what you've cooked!</p>
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">⭐ Bedøm dine måltider</h2>
+        <p class="text-gray-600 mb-8">Hjælp med at forbedre fremtidige madplaner ved at bedømme hvad du har lavet!</p>
 
         {% if unrated_meals %}
         <form hx-post="/rate-meals/submit" hx-target="#result-message">
@@ -15,12 +15,12 @@
                 {% for meal in unrated_meals %}
                 <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
                     <h3 class="text-xl font-semibold text-gray-800 mb-4">{{ meal.meal_name }}</h3>
-                    <p class="text-sm text-gray-500 mb-4">Day {{ meal.day_number }} • {{ meal.plan_date }}</p>
+                    <p class="text-sm text-gray-500 mb-4">Dag {{ meal.day_number }} • {{ meal.plan_date }}</p>
                     <input type="hidden" name="meal_id_{{ loop.index }}" value="{{ meal.id }}">
 
                     <!-- Star Rating -->
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Rating *</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Bedømmelse *</label>
                         <div class="flex gap-1 star-rating">
                             {% for star in range(1, 6) %}
                             <label class="cursor-pointer star-label">
@@ -35,10 +35,10 @@
 
                     <!-- Comments -->
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Comments (optional)</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Kommentarer (valgfrit)</label>
                         <textarea name="comments_{{ loop.index }}" rows="2"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            placeholder="What did you think? Any adjustments?"></textarea>
+                            placeholder="Hvad syntes du? Nogen justeringer?"></textarea>
                     </div>
 
                     <!-- Would Repeat -->
@@ -46,9 +46,43 @@
                         <label class="flex items-center cursor-pointer">
                             <input type="checkbox" name="would_repeat_{{ loop.index }}" value="true"
                                 class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
-                            <span class="ml-2 text-sm text-gray-700">I'd make this again</span>
+                            <span class="ml-2 text-sm text-gray-700">Det ville jeg lave igen</span>
                         </label>
                     </div>
+
+                    <!-- Member feedback (optional) -->
+                    {% if members %}
+                    <details class="mt-3 border border-gray-200 rounded-lg">
+                        <summary class="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:bg-gray-50 rounded-lg select-none">
+                            Hvem spiste dette? <span class="text-xs">(valgfrit)</span>
+                        </summary>
+                        <div class="px-3 pb-3 pt-2 border-t border-gray-100 space-y-2">
+                            <input type="hidden" name="meal_name_{{ loop.index }}" value="{{ meal.meal_name }}">
+                            {% for member in members %}
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm font-medium text-gray-700 w-24 shrink-0">{{ member.display_name }}</span>
+                                <div class="flex gap-3 text-sm">
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" name="member_feedback_{{ loop.index0 + 1 }}_{{ member.id }}"
+                                            value="liked" class="text-green-600">
+                                        <span class="text-green-700">👍 Kunne lide</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" name="member_feedback_{{ loop.index0 + 1 }}_{{ member.id }}"
+                                            value="neutral" class="text-gray-500" checked>
+                                        <span class="text-gray-500">😐 Neutral</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" name="member_feedback_{{ loop.index0 + 1 }}_{{ member.id }}"
+                                            value="disliked" class="text-red-600">
+                                        <span class="text-red-600">👎 Kunne ikke lide</span>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endif %}
                 </div>
                 {% endfor %}
 
@@ -57,7 +91,7 @@
 
             <div class="mt-8">
                 <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold">
-                    Submit Ratings
+                    Send bedømmelser
                 </button>
             </div>
         </form>
@@ -65,10 +99,10 @@
 
         {% else %}
         <div class="text-center py-12">
-            <p class="text-gray-500 text-lg mb-4">No unrated meals.</p>
-            <p class="text-gray-400 mb-6">All your meals have been rated!</p>
+            <p class="text-gray-500 text-lg mb-4">Ingen ubedømte måltider.</p>
+            <p class="text-gray-400 mb-6">Alle dine måltider er blevet bedømt!</p>
             <a href="/history" class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
-                View History
+                Se historik
             </a>
         </div>
         {% endif %}

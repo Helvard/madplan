@@ -1,7 +1,7 @@
 {% set current_page = 'preferences' %}
 {% extends 'base.html' %}
 
-{% block title %}Preferences - Meal Planner{% endblock %}
+{% block title %}Indstillinger - Madplan{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-6xl">
@@ -9,43 +9,43 @@
 
         <!-- Left: Current Preferences Summary -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 Current Preferences</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 Aktuelle indstillinger</h2>
             <div class="space-y-4 text-sm">
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Family</h3>
-                    <p class="text-gray-600">• {{ preferences.family.size }} people ({{ preferences.family.composition }})</p>
+                    <h3 class="font-semibold text-gray-700 mb-2">Familie</h3>
+                    <p class="text-gray-600">• {{ preferences.family.size }} personer ({{ preferences.family.composition }})</p>
                     <p class="text-gray-600">• {{ preferences.family.note }}</p>
                 </div>
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Cooking Style</h3>
+                    <h3 class="font-semibold text-gray-700 mb-2">Madlavningsstil</h3>
                     <p class="text-gray-600">• {{ preferences.cooking.style }}</p>
-                    <p class="text-gray-600">• Priorities: {{ preferences.cooking.priorities | join(', ') }}</p>
-                    <p class="text-gray-600">• Max cook time: {{ preferences.cooking.max_cook_time }} min</p>
+                    <p class="text-gray-600">• Prioriteter: {{ preferences.cooking.priorities | join(', ') }}</p>
+                    <p class="text-gray-600">• Max tilberedningstid: {{ preferences.cooking.max_cook_time }} min</p>
                 </div>
                 {% if preferences.food.favorites %}
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Favorites</h3>
+                    <h3 class="font-semibold text-gray-700 mb-2">Favoritter</h3>
                     {% for item in preferences.food.favorites %}<p class="text-gray-600">• {{ item }}</p>{% endfor %}
                 </div>
                 {% endif %}
                 {% if preferences.food.dislikes %}
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Dislikes</h3>
+                    <h3 class="font-semibold text-gray-700 mb-2">Mislide</h3>
                     {% for item in preferences.food.dislikes %}<p class="text-gray-600">• {{ item }}</p>{% endfor %}
                 </div>
                 {% endif %}
                 {% if preferences.food.dietary_restrictions %}
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Dietary Restrictions</h3>
+                    <h3 class="font-semibold text-gray-700 mb-2">Kostbegrænsninger</h3>
                     {% for item in preferences.food.dietary_restrictions %}<p class="text-gray-600">• {{ item }}</p>{% endfor %}
                 </div>
                 {% endif %}
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-2">Planning</h3>
-                    <p class="text-gray-600">• Default: {{ preferences.planning.default_dinners }} dinners/week</p>
+                    <h3 class="font-semibold text-gray-700 mb-2">Planlægning</h3>
+                    <p class="text-gray-600">• Standard: {{ preferences.planning.default_dinners }} aftensmad/uge</p>
                     <p class="text-gray-600">• {{ preferences.planning.variety_rule }}</p>
                     {% if preferences.planning.max_budget %}
-                    <p class="text-gray-600">• Budget: {{ preferences.planning.max_budget }} kr/week</p>
+                    <p class="text-gray-600">• Budget: {{ preferences.planning.max_budget }} kr/uge</p>
                     {% endif %}
                 </div>
             </div>
@@ -58,18 +58,18 @@
                         hx-indicator="#scrape-spinner"
                         class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
                     >
-                        Sync Offers Now
+                        Synkroniser tilbud nu
                     </button>
-                    <span id="scrape-spinner" class="htmx-indicator text-gray-500 text-sm">Syncing...</span>
+                    <span id="scrape-spinner" class="htmx-indicator text-gray-500 text-sm">Synkroniserer...</span>
                     <span id="scrape-result" class="text-sm"></span>
                 </div>
                 <button
                     hx-post="/preferences/reset"
-                    hx-confirm="Are you sure you want to reset to default preferences?"
+                    hx-confirm="Er du sikker på, at du vil nulstille til standardindstillinger?"
                     hx-swap="none"
                     class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
                 >
-                    Reset to Defaults
+                    Nulstil til standard
                 </button>
             </div>
         </div>
@@ -77,19 +77,19 @@
         <!-- Right: Chat Interface for Editing -->
         <div class="bg-white rounded-lg shadow-lg h-[600px] flex flex-col">
             <div class="p-4 border-b">
-                <h2 class="text-2xl font-bold text-gray-800">💬 Edit Preferences</h2>
-                <p class="text-sm text-gray-600 mt-1">Chat with me to update your preferences</p>
+                <h2 class="text-2xl font-bold text-gray-800">💬 Rediger indstillinger</h2>
+                <p class="text-sm text-gray-600 mt-1">Chat med mig for at opdatere dine indstillinger</p>
             </div>
             <div id="pref-chat-messages" class="chat-messages flex-1 overflow-y-auto p-6 space-y-4">
                 <div class="text-center text-gray-500 py-8">
-                    <p class="text-lg mb-4">Ready to update your preferences? 👋</p>
+                    <p class="text-lg mb-4">Klar til at opdatere dine indstillinger? 👋</p>
                     <button
                         hx-post="/preferences/chat/start"
                         hx-target="#pref-chat-messages"
                         hx-swap="innerHTML"
                         class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
                     >
-                        Start Editing
+                        Begynd redigering
                     </button>
                 </div>
             </div>
@@ -97,13 +97,98 @@
                 <form id="pref-chat-form" hx-post="/preferences/chat/message"
                     hx-target="#pref-chat-messages" hx-swap="beforeend" class="flex gap-2">
                     <input type="hidden" id="pref-session-id" name="session_id" value="">
-                    <input type="text" name="message" id="pref-message-input" placeholder="Type your message..."
+                    <input type="text" name="message" id="pref-message-input" placeholder="Skriv din besked..."
                         class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                         autocomplete="off">
                     <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">Send</button>
                 </form>
             </div>
         </div>
+    </div>
+
+    <!-- Family Members -->
+    <div id="members" class="mt-6 bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-1">👨‍👩‍👧‍👦 Familiemedlemmer</h2>
+        <p class="text-sm text-gray-500 mb-6">Sæt individuelle præferencer. Claude bruger disse som blød vejledning ved udarbejdelse af madplanen.</p>
+
+        {% if members %}
+        <div class="space-y-4 mb-8">
+            {% for member in members %}
+            <details class="border border-gray-200 rounded-lg" {% if scroll_to_member == member.id %}open{% endif %}>
+                <summary class="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                    <span class="font-semibold text-gray-800">{{ member.display_name }}</span>
+                    <span class="text-xs text-gray-400">Klik for at redigere</span>
+                </summary>
+                <div class="px-4 pb-4 pt-2 border-t border-gray-100">
+                    <form method="post" action="/preferences/members/{{ member.id }}/update" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Navn</label>
+                            <input type="text" name="display_name" value="{{ member.display_name }}"
+                                class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500" required>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-green-700 mb-1">✅ Foretrukne måltider</label>
+                                <input type="text" name="liked_meals"
+                                    value="{{ member.liked_meals | join(', ') }}"
+                                    placeholder="pasta, pizza, laks, ..."
+                                    class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-red-600 mb-1">❌ Ikke foretrukne måltider</label>
+                                <input type="text" name="disliked_meals"
+                                    value="{{ member.disliked_meals | join(', ') }}"
+                                    placeholder="kartoffelmos, suppe, ..."
+                                    class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-green-700 mb-1">✅ Foretrukne ingredienser</label>
+                                <input type="text" name="liked_ingredients"
+                                    value="{{ member.liked_ingredients | join(', ') }}"
+                                    placeholder="kylling, ost, broccoli, ..."
+                                    class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-red-600 mb-1">❌ Ikke foretrukne ingredienser</label>
+                                <input type="text" name="disliked_ingredients"
+                                    value="{{ member.disliked_ingredients | join(', ') }}"
+                                    placeholder="løg, champignon, ..."
+                                    class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-400">
+                            </div>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button type="submit"
+                                class="bg-green-600 text-white px-4 py-1.5 rounded text-sm hover:bg-green-700 transition">
+                                Gem
+                            </button>
+                        </div>
+                    </form>
+                    <form method="post" action="/preferences/members/{{ member.id }}/delete"
+                        onsubmit="return confirm('Fjern {{ member.display_name }}?')" class="mt-2">
+                        <button type="submit" class="text-xs text-red-500 hover:text-red-700 transition">
+                            Fjern medlem
+                        </button>
+                    </form>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm mb-6">Ingen familiemedlemmer tilføjet endnu.</p>
+        {% endif %}
+
+        <!-- Add new member -->
+        <form method="post" action="/preferences/members/create" class="flex gap-3 items-end">
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tilføj familiemedlem</label>
+                <input type="text" name="display_name" placeholder="fx Bertil, Emma, ..."
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500" required>
+            </div>
+            <button type="submit"
+                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition">
+                + Tilføj
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}

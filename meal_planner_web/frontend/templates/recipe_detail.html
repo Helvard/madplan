@@ -1,14 +1,14 @@
 {% set current_page = 'recipes' %}
 {% extends 'base.html' %}
 
-{% block title %}{{ recipe.name }} — Recipes{% endblock %}
+{% block title %}{{ recipe.name }} — Opskrifter{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-6xl">
 
     <!-- Breadcrumb -->
     <nav class="text-sm text-gray-500 mb-4">
-        <a href="/recipes" class="hover:underline text-green-700">Recipes</a>
+        <a href="/recipes" class="hover:underline text-green-700">Opskrifter</a>
         <span class="mx-2">/</span>
         <span class="text-gray-700">{{ recipe.name }}</span>
     </nav>
@@ -30,24 +30,24 @@
 
                         <!-- Source badge -->
                         <span class="inline-block text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                            {% if recipe.source == 'ai_generated' %}🤖 AI Generated
-                            {% elif recipe.source == 'meal_plan' %}📋 Saved from Plan
-                            {% elif recipe.source == 'web_import' %}🌐 Web Import
-                            {% else %}✏️ Manual{% endif %}
+                            {% if recipe.source == 'ai_generated' %}🤖 AI-genereret
+                            {% elif recipe.source == 'meal_plan' %}📋 Gemt fra madplan
+                            {% elif recipe.source == 'web_import' %}🌐 Importeret
+                            {% else %}✏️ Manuel{% endif %}
                         </span>
                         {% if recipe.source_url %}
                         <a href="{{ recipe.source_url }}" target="_blank" rel="noopener"
-                           class="ml-2 text-xs text-blue-500 hover:underline">View original ↗</a>
+                           class="ml-2 text-xs text-blue-500 hover:underline">Se original ↗</a>
                         {% endif %}
                     </div>
 
                     <!-- Delete button -->
                     <button
                         hx-delete="/recipes/{{ recipe.id }}"
-                        hx-confirm="Delete this recipe? This cannot be undone."
+                        hx-confirm="Slet denne opskrift? Det kan ikke fortrydes."
                         hx-on::after-request="window.location='/recipes'"
                         class="text-red-400 hover:text-red-600 text-sm transition"
-                        title="Delete recipe"
+                        title="Slet opskrift"
                     >🗑</button>
                 </div>
 
@@ -57,7 +57,7 @@
                     <span>⏱ {{ recipe.cook_time_minutes }} min</span>
                     {% endif %}
                     {% if recipe.servings %}
-                    <span>🍽 {{ recipe.servings }} servings</span>
+                    <span>🍽 {{ recipe.servings }} portioner</span>
                     {% endif %}
                 </div>
 
@@ -77,7 +77,7 @@
                     {% endfor %}
                     <form hx-post="/recipes/{{ recipe.id }}/tags" hx-target="#recipe-tags" hx-swap="outerHTML"
                           hx-on::after-request="this.reset()" class="inline-flex items-center">
-                        <input name="tag" placeholder="add tag…"
+                        <input name="tag" placeholder="tilføj tag…"
                                class="border border-gray-300 rounded px-2 py-0.5 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-green-400">
                         <input type="hidden" name="action" value="add">
                         <button class="ml-1 text-xs text-green-700 hover:underline">+</button>
@@ -91,7 +91,7 @@
                 <!-- Ingredients -->
                 {% set ingredients = recipe.ingredients or [] %}
                 {% if ingredients %}
-                <h2 class="text-xl font-semibold text-gray-700 mb-3">Ingredients</h2>
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">Ingredienser</h2>
                 <ul class="space-y-1 mb-6">
                     {% for ing in ingredients %}
                     <li class="flex items-baseline gap-2 text-sm">
@@ -107,7 +107,7 @@
 
                 <!-- Instructions -->
                 {% if recipe.instructions %}
-                <h2 class="text-xl font-semibold text-gray-700 mb-3">Instructions</h2>
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">Fremgangsmåde</h2>
                 <div class="prose prose-sm max-w-none text-gray-700 mb-6">
                     {{ recipe.instructions | replace('\n', '<br>') | safe }}
                 </div>
@@ -115,7 +115,7 @@
 
                 <!-- Rating -->
                 <div class="border-t border-gray-100 pt-5 mt-5">
-                    <h3 class="font-semibold text-gray-700 mb-3">Rate this recipe</h3>
+                    <h3 class="font-semibold text-gray-700 mb-3">Bedøm opskriften</h3>
                     <form
                         hx-post="/recipes/{{ recipe.id }}/rate"
                         hx-target="#rating-result"
@@ -124,7 +124,7 @@
                     >
                         <div class="flex gap-1">
                             {% for i in range(1, 6) %}
-                            <label class="cursor-pointer text-2xl" title="{{ i }} star{{ 's' if i > 1 }}">
+                            <label class="cursor-pointer text-2xl" title="{{ i }} stjerne{{ 'r' if i > 1 }}">
                                 <input type="radio" name="rating" value="{{ i }}"
                                        {% if recipe.rating == i %}checked{% endif %}
                                        class="sr-only">
@@ -132,15 +132,15 @@
                             </label>
                             {% endfor %}
                         </div>
-                        <button type="submit" class="text-sm text-green-700 hover:underline">Save rating</button>
+                        <button type="submit" class="text-sm text-green-700 hover:underline">Gem bedømmelse</button>
                         <span id="rating-result" class="text-sm"></span>
                     </form>
                 </div>
 
                 <!-- Family Notes -->
                 <div class="border-t border-gray-100 pt-5 mt-5">
-                    <h3 class="font-semibold text-gray-700 mb-2">Family Notes</h3>
-                    <p class="text-xs text-gray-400 mb-2">Tips, memories, variations — save what works for your family.</p>
+                    <h3 class="font-semibold text-gray-700 mb-2">Familiens noter</h3>
+                    <p class="text-xs text-gray-400 mb-2">Tips, minder, variationer — gem hvad der virker for jeres familie.</p>
                     <form
                         hx-post="/recipes/{{ recipe.id }}/notes"
                         hx-target="#notes-result"
@@ -149,13 +149,13 @@
                         <textarea
                             name="notes"
                             rows="3"
-                            placeholder="e.g. kids love extra cheese, use whole-wheat pasta, great for meal prep…"
+                            placeholder="fx børnene elsker ekstra ost, brug fuldkornspasta, god til madlavning på forhånd…"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none"
                         >{{ recipe.notes or '' }}</textarea>
                         <div class="flex items-center gap-3 mt-2">
                             <button type="submit"
                                     class="bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-green-700 transition">
-                                Save Notes
+                                Gem noter
                             </button>
                             <span id="notes-result" class="text-sm"></span>
                         </div>
@@ -170,7 +170,7 @@
                         hx-swap="innerHTML"
                         class="bg-orange-500 text-white px-5 py-2 rounded-lg hover:bg-orange-600 transition font-medium text-sm"
                     >
-                        🛒 Add Ingredients to Shopping List
+                        🛒 Tilføj ingredienser til indkøbsliste
                     </button>
                     <span id="shopping-result" class="ml-3 text-sm"></span>
                 </div>
@@ -186,8 +186,8 @@
                  style="max-height: calc(100vh - 7rem);">
 
                 <div class="px-4 py-3 border-b border-gray-100 bg-green-50 rounded-t-xl">
-                    <h3 class="font-semibold text-green-800 text-sm">🤖 Ask the Chef</h3>
-                    <p class="text-xs text-green-600 mt-0.5">Variations, substitutions, scaling…</p>
+                    <h3 class="font-semibold text-green-800 text-sm">🤖 Spørg kokken</h3>
+                    <p class="text-xs text-green-600 mt-0.5">Variationer, substitutter, skalering…</p>
                 </div>
 
                 <!-- Chat messages area -->
@@ -204,7 +204,7 @@
                         hx-swap="innerHTML"
                         class="w-full bg-green-600 text-white py-2 rounded-lg text-sm hover:bg-green-700 transition"
                     >
-                        Start Cooking Chat
+                        Start madlavningschat
                     </button>
                 </div>
 

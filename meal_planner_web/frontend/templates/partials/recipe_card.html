@@ -5,10 +5,10 @@
     <!-- Header bar: source icon + cook time -->
     <div class="flex items-center justify-between px-4 pt-4 pb-2">
         <span class="text-xs text-gray-400 font-medium">
-            {% if recipe.source == 'ai_generated' %}🤖 AI Generated
-            {% elif recipe.source == 'meal_plan' %}📋 From Plan
-            {% elif recipe.source == 'web_import' %}🌐 Web Import
-            {% else %}✏️ Manual{% endif %}
+            {% if recipe.source == 'ai_generated' %}🤖 AI-genereret
+            {% elif recipe.source == 'meal_plan' %}📋 Fra madplan
+            {% elif recipe.source == 'web_import' %}🌐 Importeret
+            {% else %}✏️ Manuel{% endif %}
         </span>
         {% if recipe.cook_time_minutes %}
         <span class="text-xs text-gray-500">⏱ {{ recipe.cook_time_minutes }} min</span>

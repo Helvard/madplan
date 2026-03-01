@@ -134,10 +134,10 @@ class Database:
         ).execute()
         low_rated = low_res.data or []
 
-        # Recent rated meals for feedback context
+        # Recent rated meals for feedback context (includes member pref hits if column exists)
         rated_res = _filter(
             self.db.table("meal_history")
-            .select("meal_name, plan_date, rating, comments, would_repeat")
+            .select("meal_name, plan_date, rating, comments, would_repeat, member_pref_hits")
             .gte("plan_date", cutoff_date)
             .not_.is_("rating", "null")
             .order("plan_date", desc=True)
@@ -183,6 +183,24 @@ class Database:
                 parts.append(f"- {r['meal_name']} ({stars} {repeat}) - {r['plan_date']}")
                 if r.get("comments"):
                     parts.append(f"  \"{r['comments']}\"")
+            parts.append("")
+
+        # Member preference patterns aggregated from rated meals
+        all_liked: List[str] = []
+        all_disliked: List[str] = []
+        for r in rated_meals:
+            hits = r.get("member_pref_hits") or {}
+            all_liked.extend(hits.get("liked_hits", []))
+            all_disliked.extend(hits.get("disliked_hits", []))
+        if all_liked or all_disliked:
+            parts.append("# Member Preference History")
+            parts.append("**Use this to personalise the plan — avoid disliked meals for specific members:**")
+            if all_liked:
+                for hit in all_liked[:10]:
+                    parts.append(f"- ✅ {hit}")
+            if all_disliked:
+                for hit in all_disliked[:10]:
+                    parts.append(f"- ❌ {hit}")
             parts.append("")
 
         if not parts:
@@ -614,6 +632,133 @@ class Database:
         if notes is not None:
             updates["notes"] = notes
         self.db.table("recipes").update(updates).eq("id", recipe_id).execute()
+
+    # ========== MEMBER PREFERENCES ==========
+
+    def get_member_preferences(self, household_id: int) -> List[Dict]:
+        """Return all member profiles for a household, ordered by creation date."""
+        res = (
+            self.db.table("member_preferences")
+            .select("*")
+            .eq("household_id", household_id)
+            .order("created_at")
+            .execute()
+        )
+        return res.data or []
+
+    def create_member_profile(self, household_id: int, display_name: str,
+                              user_profile_id: str = None) -> Dict:
+        """Insert a new member profile and return the created row."""
+        row: Dict = {
+            "household_id": household_id,
+            "display_name": display_name.strip(),
+        }
+        if user_profile_id:
+            row["user_profile_id"] = user_profile_id
+        res = self.db.table("member_preferences").insert(row).execute()
+        return res.data[0]
+
+    def update_member_preferences(self, member_id: int, household_id: int,
+                                  updates: Dict) -> Optional[Dict]:
+        """Update allowed fields on a member profile."""
+        allowed = {
+            "display_name", "liked_meals", "disliked_meals",
+            "liked_ingredients", "disliked_ingredients", "can_self_edit",
+        }
+        safe = {k: v for k, v in updates.items() if k in allowed}
+        if not safe:
+            return None
+        res = (
+            self.db.table("member_preferences")
+            .update(safe)
+            .eq("id", member_id)
+            .eq("household_id", household_id)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def delete_member_profile(self, member_id: int, household_id: int):
+        """Delete a member profile, scoped to the household."""
+        (
+            self.db.table("member_preferences")
+            .delete()
+            .eq("id", member_id)
+            .eq("household_id", household_id)
+            .execute()
+        )
+
+    def get_member_profile_for_user(self, user_profile_id: str) -> Optional[Dict]:
+        """Return a member profile linked to a specific user_profile_id, or None."""
+        res = (
+            self.db.table("member_preferences")
+            .select("*")
+            .eq("user_profile_id", user_profile_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def save_member_pref_hits(self, meal_id: int, hits: Dict):
+        """Write member preference hits to a meal_history row (Stage C)."""
+        self.db.table("meal_history").update(
+            {"member_pref_hits": hits}
+        ).eq("id", meal_id).execute()
+
+    # ========== STAPLES ==========
+
+    def get_staples(self, household_id: int) -> List[Dict]:
+        """Return all staples for a household, most-used first."""
+        res = (
+            self.db.table("staples")
+            .select("*")
+            .eq("household_id", household_id)
+            .order("times_added", desc=True)
+            .order("item_name")
+            .execute()
+        )
+        return res.data or []
+
+    def create_staple(self, household_id: int, item_name: str,
+                      category: str = None, quantity: str = None) -> Dict:
+        """Insert a new staple and return the row."""
+        row = {
+            "household_id": household_id,
+            "item_name": item_name.strip(),
+            "category": category or self._auto_categorize_item(item_name),
+            "quantity": quantity or None,
+        }
+        res = self.db.table("staples").insert(row).execute()
+        return res.data[0]
+
+    def delete_staple(self, staple_id: int, household_id: int):
+        """Delete a staple scoped to the household."""
+        (
+            self.db.table("staples")
+            .delete()
+            .eq("id", staple_id)
+            .eq("household_id", household_id)
+            .execute()
+        )
+
+    def increment_staple_usage(self, staple_ids: List[int], household_id: int):
+        """Increment times_added and update last_added_at for given staples."""
+        for staple_id in staple_ids:
+            # Fetch current count first (Supabase Python SDK doesn't support column += 1 directly)
+            res = (
+                self.db.table("staples")
+                .select("times_added")
+                .eq("id", staple_id)
+                .eq("household_id", household_id)
+                .limit(1)
+                .execute()
+            )
+            if not res.data:
+                continue
+            current = res.data[0]["times_added"]
+            self.db.table("staples").update({
+                "times_added": current + 1,
+                "last_added_at": _now(),
+            }).eq("id", staple_id).eq("household_id", household_id).execute()
 
     # ========== HELPERS ==========
 

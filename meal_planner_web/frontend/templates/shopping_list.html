@@ -1,83 +1,97 @@
 {% set current_page = 'shopping' %}
 {% extends 'base.html' %}
 
-{% block title %}Shopping List - Meal Planner{% endblock %}
+{% block title %}Indkøbsliste - Madplan{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">🛒 Shopping List</h1>
+            <h1 class="text-3xl font-bold text-gray-900">🛒 Indkøbsliste</h1>
             {% if shopping_list %}
             <p class="text-gray-600 mt-1">{{ shopping_list.name }}</p>
             {% endif %}
         </div>
     </div>
 
-    {% if items and items|length > 0 %}
-    <!-- Progress Bar -->
-    <div class="mb-6">
-        {% include 'partials/shopping_list_stats.html' %}
-    </div>
+    <div class="flex gap-6 items-start">
+        <!-- Left: Main shopping list -->
+        <div class="flex-1 min-w-0">
+            {% if items and items|length > 0 %}
+            <!-- Progress Bar -->
+            <div class="mb-6">
+                {% include 'partials/shopping_list_stats.html' %}
+            </div>
 
-    <!-- Add Item Form -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
-        <h3 class="font-semibold text-gray-900 mb-3">Add Item Manually</h3>
-        <form method="post" action="/shopping-list/add-item" class="flex gap-3">
-            <input type="text" name="item_name" placeholder="Item name..."
-                class="flex-1 border border-gray-300 rounded-lg px-4 py-2" required>
-            <input type="text" name="quantity" placeholder="Qty"
-                class="w-24 border border-gray-300 rounded-lg px-4 py-2">
-            <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
-                + Add
-            </button>
-        </form>
-    </div>
+            <!-- Add Item Form -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <h3 class="font-semibold text-gray-900 mb-3">Tilføj vare manuelt</h3>
+                <form method="post" action="/shopping-list/add-item" class="flex gap-3">
+                    <input type="text" name="item_name" placeholder="Varenavn..."
+                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2" required>
+                    <input type="text" name="quantity" placeholder="Antal"
+                        class="w-24 border border-gray-300 rounded-lg px-4 py-2">
+                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                        + Tilføj
+                    </button>
+                </form>
+            </div>
 
-    <!-- Shopping List Items -->
-    <div id="shopping-list-items">
-        {% include 'partials/shopping_list_items.html' %}
-    </div>
+            <!-- Shopping List Items -->
+            <div id="shopping-list-items">
+                {% include 'partials/shopping_list_items.html' %}
+            </div>
 
-    <!-- Action Buttons -->
-    <div class="mt-6 flex gap-3">
-        <form method="post" action="/shopping-list/clear" style="display: inline;">
-            <input type="hidden" name="clear_type" value="checked">
-            <button type="submit" onclick="return confirm('Remove all checked items?')"
-                class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
-                Clear Checked Items
-            </button>
-        </form>
-        <form method="post" action="/shopping-list/clear" style="display: inline;">
-            <input type="hidden" name="clear_type" value="all">
-            <button type="submit" onclick="return confirm('Remove ALL items?')"
-                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
-                Clear All Items
-            </button>
-        </form>
-    </div>
+            <!-- Action Buttons -->
+            <div class="mt-6 flex gap-3">
+                <form method="post" action="/shopping-list/clear" style="display: inline;">
+                    <input type="hidden" name="clear_type" value="checked">
+                    <button type="submit" onclick="return confirm('Fjern alle afkrydsede varer?')"
+                        class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
+                        Ryd afkrydsede
+                    </button>
+                </form>
+                <form method="post" action="/shopping-list/clear" style="display: inline;">
+                    <input type="hidden" name="clear_type" value="all">
+                    <button type="submit" onclick="return confirm('Fjern ALLE varer?')"
+                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                        Ryd hele listen
+                    </button>
+                </form>
+            </div>
 
-    {% else %}
-    <!-- Empty State -->
-    <div class="text-center py-12 bg-white rounded-lg shadow">
-        <div class="text-6xl mb-4">🛒</div>
-        <h3 class="text-xl font-semibold text-gray-900 mb-2">Your shopping list is empty</h3>
-        <p class="text-gray-600 mb-6">Add items from offers or manually</p>
-        <div class="max-w-md mx-auto mb-6">
-            <form method="post" action="/shopping-list/add-item" class="flex gap-3">
-                <input type="text" name="item_name" placeholder="Add your first item..."
-                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2" required>
-                <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
-                    + Add
-                </button>
-            </form>
+            {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-12 bg-white rounded-lg shadow">
+                <div class="text-6xl mb-4">🛒</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Indkøbslisten er tom</h3>
+                <p class="text-gray-600 mb-6">Tilføj varer fra tilbud eller manuelt</p>
+                <div class="max-w-md mx-auto mb-6">
+                    <form method="post" action="/shopping-list/add-item" class="flex gap-3">
+                        <input type="text" name="item_name" placeholder="Tilføj din første vare..."
+                            class="flex-1 border border-gray-300 rounded-lg px-4 py-2" required>
+                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                            + Tilføj
+                        </button>
+                    </form>
+                </div>
+                <div class="flex gap-3 justify-center">
+                    <a href="/offers" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Se tilbud</a>
+                    <a href="/" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Planlæg måltider</a>
+                </div>
+            </div>
+            {% endif %}
         </div>
-        <div class="flex gap-3 justify-center">
-            <a href="/offers" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Browse Offers</a>
-            <a href="/" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Plan Meals</a>
+
+        <!-- Right: Staples sidebar -->
+        <div class="w-72 shrink-0">
+            <div class="bg-white rounded-lg shadow p-4 sticky top-24">
+                <h3 class="font-semibold text-gray-900 mb-1">📌 Faste varer</h3>
+                <p class="text-xs text-gray-500 mb-4">Varer I altid køber — tilføj hurtigt til listen.</p>
+                {% include 'partials/staples_panel.html' %}
+            </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}

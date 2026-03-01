@@ -1,7 +1,7 @@
 {% set current_page = 'plan' %}
 {% extends 'base.html' %}
 
-{% block title %}Meal Planner{% endblock %}
+{% block title %}Madplan{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-4xl">
@@ -11,8 +11,8 @@
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0 text-3xl">🎯</div>
             <div class="flex-1">
-                <h3 class="font-bold text-blue-900 text-lg mb-2">Must-Use Ingredients Selected</h3>
-                <p class="text-sm text-blue-800 mb-3">You've selected these items from offers. They will be included in your meal plan:</p>
+                <h3 class="font-bold text-blue-900 text-lg mb-2">Valgte ingredienser fra tilbud</h3>
+                <p class="text-sm text-blue-800 mb-3">Du har valgt disse varer fra tilbud. De medtages i din madplan:</p>
                 <div class="space-y-2">
                     {% for offer in selected_offers %}
                     <div class="flex items-center gap-2 bg-white rounded px-3 py-2">
@@ -25,9 +25,9 @@
                     {% endfor %}
                 </div>
                 <div class="mt-3 flex gap-2">
-                    <a href="/offers" class="text-sm text-blue-700 hover:text-blue-900 underline">Add more items</a>
+                    <a href="/offers" class="text-sm text-blue-700 hover:text-blue-900 underline">Tilføj flere varer</a>
                     <span class="text-gray-400">•</span>
-                    <button onclick="clearSelectedOffers()" class="text-sm text-red-600 hover:text-red-800 underline">Clear all selections</button>
+                    <button onclick="clearSelectedOffers()" class="text-sm text-red-600 hover:text-red-800 underline">Ryd alle valg</button>
                 </div>
             </div>
         </div>
@@ -39,11 +39,11 @@
     <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
         <div class="flex items-center justify-between">
             <div>
-                <h3 class="font-semibold text-gray-800">Want to browse current offers first?</h3>
-                <p class="text-sm text-gray-600">Select specific items to include in your meal plan</p>
+                <h3 class="font-semibold text-gray-800">Vil du se aktuelle tilbud først?</h3>
+                <p class="text-sm text-gray-600">Vælg specifikke varer til din madplan</p>
             </div>
             <a href="/offers" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition whitespace-nowrap">
-                Browse Offers →
+                Se tilbud →
             </a>
         </div>
     </div>
@@ -53,9 +53,9 @@
         <!-- Chat Messages Area -->
         <div id="chat-messages" class="chat-messages flex-1 overflow-y-auto p-6 space-y-4">
             <div class="text-center text-gray-500 py-8">
-                <p class="text-lg mb-4">Welcome to Meal Planner! 👋</p>
+                <p class="text-lg mb-4">Velkommen til Madplan! 👋</p>
                 {% if selected_offers and selected_offers|length > 0 %}
-                <p class="text-sm text-gray-600 mb-4">Ready to plan meals using your selected ingredients?</p>
+                <p class="text-sm text-gray-600 mb-4">Klar til at planlægge med dine valgte varer?</p>
                 {% endif %}
                 <button
                     hx-post="/chat/start"
@@ -63,7 +63,7 @@
                     hx-swap="innerHTML"
                     class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
                 >
-                    Start Planning
+                    Kom i gang
                 </button>
             </div>
         </div>
@@ -72,7 +72,7 @@
         <div class="border-t p-4">
             <form id="chat-form" hx-post="/chat/message" hx-target="#chat-messages" hx-swap="beforeend" class="flex gap-2">
                 <input type="hidden" id="session-id" name="session_id" value="">
-                <input type="text" name="message" id="message-input" placeholder="Type your message..."
+                <input type="text" name="message" id="message-input" placeholder="Skriv din besked..."
                     class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                     autocomplete="off">
                 <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">Send</button>
@@ -95,7 +95,7 @@
         if (el) document.getElementById('session-id').value = el.getAttribute('data-session-id');
     });
     function clearSelectedOffers() {
-        if (confirm('Clear all selected items? You can always select more from the offers page.')) {
+        if (confirm('Ryd alle valgte varer? Du kan altid vælge flere fra tilbudssiden.')) {
             fetch('/offers/clear-selected', { method: 'POST' }).then(() => window.location.reload());
         }
     }
