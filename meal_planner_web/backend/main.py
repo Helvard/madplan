@@ -1624,16 +1624,8 @@ async def clear_shopping_list_endpoint(
             db.clear_shopping_list(active_list['id'], clear_checked_only=True)
         else:
             db.clear_shopping_list(active_list['id'])
-        
-        # Return updated list
-        items_by_category = db.get_shopping_list_by_category(active_list['id'])
-        stats = db.get_shopping_list_stats(active_list['id'])
-        
-        return templates.TemplateResponse("partials/shopping_list_items.html", {
-            "request": request,
-            "items_by_category": items_by_category,
-            "stats": stats
-        })
+
+        return RedirectResponse(url="/shopping-list", status_code=303)
     
     except Exception as e:
         print(f"Error clearing list: {e}")
