@@ -1819,36 +1819,56 @@ async def add_from_offers_endpoint(request: Request):
 async def add_from_meal_plan_endpoint(
     request: Request,
     session_id: str = Form(...),
-    meal_plan: str = Form(...)
 ):
-    """Parse meal plan and add shopping list items."""
+    """Parse the stored meal plan for this session and add items to the shopping list."""
+
+    def _err(msg: str) -> HTMLResponse:
+        """Return a visible error div (always HTTP 200 so HTMX swaps it in)."""
+        return HTMLResponse(
+            f'<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">❌ {msg}</div>',
+            status_code=200,
+        )
+
     try:
         _, household_id = _require_auth(request)
-        active_list = db.get_active_shopping_list(household_id=household_id)
+        if not household_id:
+            return _err("Ikke logget ind — genindlæs siden og prøv igen.")
 
-        # Auto-create a shopping list if none exists (user may not have visited the page yet)
+        # Retrieve the meal plan from the in-memory chat session.
+        # It is stored there when the plan is generated, so no need to pass
+        # the full text through the browser (which caused encoding issues).
+        if session_id not in chat_sessions:
+            return _err("Sessionen er udløbet — generer venligst en ny madplan.")
+
+        meal_plan = chat_sessions[session_id].get("meal_plan")
+        if not meal_plan:
+            return _err("Ingen madplan fundet i sessionen — generer venligst en ny madplan.")
+
+        print(f"[add_from_meal_plan] session={session_id[:8]}… meal_plan={len(meal_plan)} chars")
+
+        # Parse the shopping list section out of the meal plan
+        parser = ShoppingListParser()
+        items = parser.parse_shopping_list(meal_plan)
+
+        print(f"[add_from_meal_plan] parsed {len(items)} items")
+
+        if not items:
+            # Dump the first 300 chars so we can diagnose format issues in the logs
+            print(f"[add_from_meal_plan] WARNING: 0 items. meal_plan start:\n{meal_plan[:300]}")
+            return _err(
+                "Kunne ikke finde en indkøbsliste i madplanen. "
+                "Tjek at Claude har genereret et '## Shopping List' afsnit."
+            )
+
+        # Get or create the active shopping list for this household
+        active_list = db.get_active_shopping_list(household_id=household_id)
         if not active_list:
             list_id = db.create_shopping_list(
                 f"Indkøbsliste {datetime.now().strftime('%Y-%m-%d')}", household_id=household_id
             )
             active_list = {"id": list_id}
 
-        # Parse shopping list from meal plan
-        parser = ShoppingListParser()
-        items = parser.parse_shopping_list(meal_plan)
-
-        print(f"[add_from_meal_plan] Parsed {len(items)} items from meal plan ({len(meal_plan)} chars)")
-
-        if not items:
-            return HTMLResponse(
-                """<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-                    ⚠️ Kunne ikke udtrække indkøbsliste fra madplanen. Gå til <a href="/shopping-list" class="underline">indkøbslisten</a> for at tilføje varer manuelt.
-                </div>""",
-                status_code=200
-            )
-
-        # Add items one by one so duplicate merging logic runs correctly
-        added_count = 0
+        # Add items one by one so the duplicate-merging logic in add_shopping_list_item runs
         for item in items:
             db.add_shopping_list_item(
                 list_id=active_list["id"],
@@ -1858,27 +1878,21 @@ async def add_from_meal_plan_endpoint(
                 source="meal_plan",
                 price_estimate=item.get("price_estimate"),
             )
-            added_count += 1
 
-        # Return success message
+        print(f"[add_from_meal_plan] added {len(items)} items to list {active_list['id']}")
+
         return HTMLResponse(
-            f"""<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                ✅ {added_count} varer tilføjet til din indkøbsliste!
-                <a href="/shopping-list" class="underline ml-2">Se indkøbsliste →</a>
-            </div>""",
-            status_code=200
+            f'<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">'
+            f'✅ {len(items)} varer tilføjet til din indkøbsliste! '
+            f'<a href="/shopping-list" class="underline font-medium ml-1">Se indkøbsliste →</a>'
+            f'</div>',
+            status_code=200,
         )
 
     except Exception as e:
-        print(f"Error adding from meal plan: {e}")
         import traceback
         traceback.print_exc()
-        return HTMLResponse(
-            f"""<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                ❌ Fejl: {str(e)}
-            </div>""",
-            status_code=500
-        )
+        return _err(f"Uventet fejl: {e}")
 
 
 # ---------------------------------------------------------------------------

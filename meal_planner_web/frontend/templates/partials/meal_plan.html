@@ -59,7 +59,7 @@
                 <div class="flex flex-wrap gap-3 items-center">
                     <button
                         hx-post="/shopping-list/add-from-meal-plan"
-                        hx-vals='{"session_id": "{{ session_id }}", "meal_plan": {{ meal_plan_raw|tojson }}}'
+                        hx-vals='{"session_id": "{{ session_id }}"}'
                         hx-target="#shopping-list-prompt-{{ session_id }}"
                         hx-swap="outerHTML"
                         hx-disabled-elt="this"
