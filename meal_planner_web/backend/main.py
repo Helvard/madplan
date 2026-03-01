@@ -32,6 +32,7 @@ from claude_client import ClaudeClient
 from scraper import load_offers_from_db, format_offers_for_claude
 from scrape_rema_to_db import fetch_offers, sync_offers
 from auth import get_current_user, login_redirect
+from shopping_list_parser import ShoppingListParser
 
 app = FastAPI(title="Meal Planner")
 
