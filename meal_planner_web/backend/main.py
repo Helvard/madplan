@@ -342,26 +342,6 @@ async def get_shopping_list_stats(request: Request):
     })
 
 
-@app.post("/shopping-list/toggle/{item_id}")
-async def toggle_shopping_list_item_endpoint(item_id: int):
-    """Toggle checked status of an item."""
-    db = Database()
-    db.toggle_shopping_list_item(item_id)
-    
-    # Redirect back to shopping list page
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/shopping-list", status_code=303)
-
-@app.post("/shopping-list/item/{item_id}/delete")
-async def delete_shopping_list_item_endpoint(item_id: int):
-    """Delete an item from shopping list."""
-    db = Database()
-    db.remove_shopping_list_item(item_id)
-    
-    # Redirect back to shopping list page
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/shopping-list", status_code=303)
-
 @app.delete("/shopping-list/item/{item_id}", response_class=HTMLResponse)
 async def remove_shopping_list_item_endpoint(item_id: int):
     """Remove an item from shopping list."""
@@ -374,27 +354,6 @@ async def remove_shopping_list_item_endpoint(item_id: int):
     </script>
     """
 
-
-@app.post("/shopping-list/clear-checked")
-async def clear_checked_items(request: Request):
-    """Clear all checked items from shopping list."""
-    _, household_id = _require_auth(request)
-    db = Database()
-    shopping_list = db.get_active_shopping_list(household_id=household_id)
-    if shopping_list:
-        db.clear_shopping_list(shopping_list['id'], checked_only=True)
-    return RedirectResponse(url="/shopping-list", status_code=303)
-
-
-@app.post("/shopping-list/clear-all")
-async def clear_all_items(request: Request):
-    """Clear all items from shopping list."""
-    _, household_id = _require_auth(request)
-    db = Database()
-    shopping_list = db.get_active_shopping_list(household_id=household_id)
-    if shopping_list:
-        db.clear_shopping_list(shopping_list['id'], checked_only=False)
-    return RedirectResponse(url="/shopping-list", status_code=303)
 
 
 @app.get("/shopping-list/export-pdf")
@@ -903,7 +862,7 @@ async def filter_offers(
     sort: str = "savings"
 ):
     """Filter and sort offers based on user selections."""
-    query = db._client.table("offers").select(
+    query = db.db.table("offers").select(
         "product_id, name, underline, price, price_numeric, normal_price, savings_percent, price_per_unit, department, category"
     )
 
@@ -1121,14 +1080,14 @@ async def submit_offer_selections(request: Request):
         <div class="flex gap-3">
             {f'<a href="/" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-block">Go to Meal Planner</a>' if meal_plan_selections else ''}
             {f'<a href="/shopping-list" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 inline-block">View Shopping List</a>' if shopping_list_selections else ''}
-            <button onclick="clearForm()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Continue Browsing</button>
+            <button onclick="document.getElementById('success-message').innerHTML=''" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Continue Browsing</button>
         </div>
     </div>
     
     <script>
         // Trigger shopping list badge update
         document.body.dispatchEvent(new Event('shopping-list-updated'));
-        
+
         function clearForm() {{
             // Uncheck all checkboxes
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
@@ -1139,11 +1098,12 @@ async def submit_offer_selections(request: Request):
                 input.classList.remove('bg-white', 'text-gray-900');
                 input.classList.add('bg-gray-100', 'text-gray-400');
             }});
-            // Hide success message
-            document.getElementById('success-message').innerHTML = '';
             // Update count
             updateSelectedCount();
         }}
+
+        // Auto-clear form on success so re-submitting is not possible
+        clearForm();
     </script>
     """
 
