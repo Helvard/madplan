@@ -268,6 +268,64 @@ async def household_join(request: Request, invite_code: str = Form(...)):
     return RedirectResponse(url="/household", status_code=303)
 
 
+@app.get("/rema/search")
+async def rema_live_search(q: str = "", limit: int = 8):
+    """Live search the full Rema 1000 catalog via Algolia (no discount filter).
+    Used for autocomplete when adding items to the shopping list.
+    """
+    from fastapi.responses import JSONResponse
+    import urllib.parse
+
+    q = q.strip()
+    if len(q) < 2:
+        return JSONResponse([])
+
+    ALGOLIA_APP_ID  = os.environ.get("ALGOLIA_APP_ID",  "FLWDN2189E")
+    ALGOLIA_API_KEY = os.environ.get("ALGOLIA_API_KEY", "fa20981a63df668e871a87a8fbd0caed")
+    ALGOLIA_INDEX   = "aws-prod-products"
+    ALGOLIA_URL     = f"https://flwdn2189e-dsn.algolia.net/1/indexes/{ALGOLIA_INDEX}/query"
+
+    params_string = "&".join([
+        f"query={urllib.parse.quote(q)}",
+        f"length={min(limit, 20)}",
+        "offset=0",
+    ])
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                ALGOLIA_URL,
+                params={
+                    "x-algolia-agent": "Algolia for vanilla JavaScript 3.21.1",
+                    "x-algolia-application-id": ALGOLIA_APP_ID,
+                    "x-algolia-api-key": ALGOLIA_API_KEY,
+                },
+                headers={"accept": "application/json", "content-type": "application/json"},
+                json={"params": params_string},
+            )
+        resp.raise_for_status()
+        hits = resp.json().get("hits", [])
+    except Exception:
+        return JSONResponse([])
+
+    results = []
+    for h in hits:
+        pricing = h.get("pricing", {})
+        price   = pricing.get("price")
+        labels  = h.get("labels") or []
+        results.append({
+            "product_id":   h.get("objectID"),
+            "name":         h.get("name"),
+            "underline":    h.get("underline"),
+            "price":        price,
+            "price_str":    f"{price:.2f} kr".replace(".", ",") if price else None,
+            "is_on_offer":  "on_discount" in labels,
+            "department":   h.get("department_name"),
+        })
+
+    return JSONResponse(results)
+
+
 @app.get("/shopping-list/items", response_class=HTMLResponse)
 async def get_shopping_list_items_html(request: Request):
     """Get shopping list items as HTML partial."""
@@ -2166,6 +2224,42 @@ async def recipes_search(request: Request, q: str = "", tag: str = ""):
     return HTMLResponse("".join(html_parts))
 
 
+def _ingredients_to_text(ingredients) -> str:
+    """Format ingredient list as one-per-line text for editing."""
+    lines = []
+    for ing in (ingredients or []):
+        parts = [str(ing.get("quantity") or ""), ing.get("unit") or "", ing.get("name") or ""]
+        lines.append(" ".join(p for p in parts if p).strip())
+    return "\n".join(lines)
+
+
+def _parse_ingredients_text(text: str) -> list:
+    """Parse textarea (one ingredient per line) back into ingredient dicts."""
+    common_units = {"g", "kg", "dl", "l", "ml", "cl", "stk", "pcs", "tbsp", "tsp",
+                    "cup", "cups", "spsk", "tsk", "knsp", "fed", "bundt"}
+    ingredients = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) == 1:
+            ingredients.append({"name": parts[0], "quantity": None, "unit": None})
+        elif len(parts) == 2:
+            if parts[0][0].isdigit():
+                ingredients.append({"quantity": parts[0], "unit": None, "name": parts[1]})
+            else:
+                ingredients.append({"quantity": None, "unit": None, "name": line})
+        else:
+            if parts[0][0].isdigit() and parts[1].lower() in common_units:
+                ingredients.append({"quantity": parts[0], "unit": parts[1], "name": parts[2]})
+            elif parts[0][0].isdigit():
+                ingredients.append({"quantity": parts[0], "unit": None, "name": " ".join(parts[1:])})
+            else:
+                ingredients.append({"quantity": None, "unit": None, "name": line})
+    return ingredients
+
+
 @app.get("/recipes/{recipe_id}", response_class=HTMLResponse)
 async def recipe_detail(request: Request, recipe_id: int):
     user, household_id = _require_auth(request)
@@ -2180,7 +2274,44 @@ async def recipe_detail(request: Request, recipe_id: int):
         "request": request,
         "user": user,
         "recipe": recipe,
+        "ingredients_text": _ingredients_to_text(recipe.get("ingredients")),
     })
+
+
+@app.post("/recipes/{recipe_id}/edit", response_class=HTMLResponse)
+async def recipe_edit(
+    request: Request,
+    recipe_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    cook_time_minutes: str = Form(""),
+    servings: str = Form(""),
+    ingredients_text: str = Form(""),
+    instructions: str = Form(""),
+):
+    user, household_id = _require_auth(request)
+    if not user:
+        return login_redirect()
+
+    updates = {
+        "name": name.strip(),
+        "description": description.strip(),
+        "instructions": instructions.strip(),
+        "ingredients": _parse_ingredients_text(ingredients_text),
+    }
+    if cook_time_minutes.strip():
+        try:
+            updates["cook_time_minutes"] = int(cook_time_minutes)
+        except ValueError:
+            pass
+    if servings.strip():
+        try:
+            updates["servings"] = int(servings)
+        except ValueError:
+            pass
+
+    db.update_recipe(recipe_id, household_id, updates)
+    return RedirectResponse(url=f"/recipes/{recipe_id}", status_code=303)
 
 
 @app.post("/recipes/generate", response_class=HTMLResponse)

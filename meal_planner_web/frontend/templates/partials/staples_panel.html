@@ -7,15 +7,21 @@
         <div class="space-y-2 mb-4">
             {% for staple in staples %}
             <div class="flex items-center justify-between py-2 px-1 border-b border-gray-100 last:border-0">
-                <label class="flex items-center gap-3 flex-1 cursor-pointer">
+                <label class="flex items-center gap-2 flex-1 cursor-pointer min-w-0">
                     <input type="checkbox" name="staple_{{ staple.id }}" value="on"
-                           class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
-                    <span class="text-sm font-medium text-gray-800">{{ staple.item_name }}</span>
+                           class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 flex-shrink-0">
+                    <span class="text-sm font-medium text-gray-800 truncate">{{ staple.item_name }}</span>
                     {% if staple.quantity %}
-                    <span class="text-xs text-gray-500">{{ staple.quantity }}</span>
+                    <span class="text-xs text-gray-500 flex-shrink-0">{{ staple.quantity }}</span>
+                    {% endif %}
+                    {% if staple.current_price %}
+                    <span class="text-xs flex-shrink-0 {% if staple.is_on_offer %}text-green-600 font-semibold{% else %}text-gray-400{% endif %}"
+                          title="{% if staple.is_on_offer %}Tilbud! Spar {{ staple.savings_percent|int }}%{% else %}Rema pris{% endif %}">
+                        {{ "%.0f"|format(staple.current_price) }} kr{% if staple.is_on_offer %} 🔥{% endif %}
+                    </span>
                     {% endif %}
                     {% if staple.times_added > 0 %}
-                    <span class="text-xs text-gray-400 ml-1" title="Tilføjet {{ staple.times_added }} gange">
+                    <span class="text-xs text-gray-400 flex-shrink-0" title="Tilføjet {{ staple.times_added }} gange">
                         ×{{ staple.times_added }}
                     </span>
                     {% endif %}

@@ -118,6 +118,79 @@ def sync_offers(offers: List[Dict]):
     return inserted
 
 
+def search_product(query: str) -> Dict | None:
+    """Search Algolia catalog (no discount filter) for a single product by name.
+    Returns the top hit or None if nothing found."""
+    import urllib.parse
+    params_string = "&".join([
+        f"query={urllib.parse.quote(query)}",
+        "length=1",
+        "offset=0",
+    ])
+    try:
+        response = requests.post(
+            ALGOLIA_URL,
+            params={
+                "x-algolia-agent": "Algolia for vanilla JavaScript 3.21.1",
+                "x-algolia-application-id": ALGOLIA_APP_ID,
+                "x-algolia-api-key": ALGOLIA_API_KEY,
+            },
+            headers={"accept": "application/json", "content-type": "application/json"},
+            json={"params": params_string},
+            timeout=10,
+        )
+        response.raise_for_status()
+        hits = response.json().get("hits", [])
+        return hits[0] if hits else None
+    except Exception as e:
+        logger.warning("Algolia search failed for %r: %s", query, e)
+        return None
+
+
+def sync_staple_prices():
+    """After the offers sync, look up current Rema prices for all staples.
+
+    For each staple item, searches Algolia by name (full catalog, not just
+    discounted items) and updates the staples table with the current price and
+    whether the item is currently on offer.
+    """
+    res = _client.table("staples").select("id, item_name").execute()
+    staples = res.data or []
+    if not staples:
+        logger.info("No staples found — skipping price sync.")
+        return
+
+    logger.info("Syncing Rema prices for %d staple(s)...", len(staples))
+    updated = 0
+    for staple in staples:
+        hit = search_product(staple["item_name"])
+        if not hit:
+            logger.debug("No Rema match for staple %r", staple["item_name"])
+            continue
+
+        pricing = hit.get("pricing", {})
+        sale_price   = pricing.get("price") or 0
+        normal_price = pricing.get("normal_price")
+        labels       = hit.get("labels") or []
+        is_on_offer  = "on_discount" in labels
+
+        savings_pct = None
+        if is_on_offer and normal_price and sale_price:
+            savings_pct = round((1 - sale_price / normal_price) * 100, 1)
+
+        _client.table("staples").update({
+            "rema_product_id":  str(hit.get("objectID")),
+            "current_price":    sale_price if sale_price else None,
+            "normal_price":     normal_price if is_on_offer else None,
+            "is_on_offer":      is_on_offer,
+            "savings_percent":  savings_pct,
+            "price_updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", staple["id"]).execute()
+        updated += 1
+
+    logger.info("Staple price sync complete: %d/%d updated.", updated, len(staples))
+
+
 def print_summary(offers: List[Dict]):
     """Log a brief summary of synced offers."""
     from collections import Counter
@@ -146,6 +219,8 @@ def main():
     logger.info("Inserted %d offers into Supabase", inserted)
 
     print_summary(offers)
+
+    sync_staple_prices()
     logger.info("Done.")
 
 
