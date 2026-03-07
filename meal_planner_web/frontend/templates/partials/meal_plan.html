@@ -54,13 +54,13 @@
 
             <!-- Shopping List Prompt (Hidden initially) -->
             <!-- The entire prompt div is swapped out by the "Yes" button response (outerHTML) -->
-            <div id="shopping-list-prompt-{{ session_id }}" class="hidden mb-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div id="shopping-list-prompt-{{ session_id }}" class="shopping-list-prompt hidden mb-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p class="font-semibold mb-3">📝 Vil du tilføje ingredienser til indkøbslisten?</p>
                 <div class="flex flex-wrap gap-3 items-center">
                     <button
                         hx-post="/shopping-list/add-from-meal-plan"
                         hx-vals='{"session_id": "{{ session_id }}"}'
-                        hx-target="#shopping-list-prompt-{{ session_id }}"
+                        hx-target="closest .shopping-list-prompt"
                         hx-swap="outerHTML"
                         hx-disabled-elt="this"
                         class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"

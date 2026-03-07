@@ -12,6 +12,7 @@ from pathlib import Path
 import asyncio
 import json
 import os
+import uuid
 from datetime import datetime
 from typing import Optional
 from html import escape
@@ -429,7 +430,7 @@ async def export_shopping_list_pdf():
 @app.post("/chat/start")
 async def start_chat(request: Request):
     """Start a new chat session."""
-    session_id = datetime.now().isoformat()
+    session_id = uuid.uuid4().hex
     
     chat_sessions[session_id] = {
         "state": "ask_num_dinners",
@@ -1297,7 +1298,7 @@ pref_chat_sessions = {}
 @app.post("/preferences/chat/start")
 async def start_pref_chat(request: Request):
     """Start a preference editing chat session."""
-    session_id = datetime.now().isoformat()
+    session_id = uuid.uuid4().hex
     
     pref_chat_sessions[session_id] = {
         "state": "editing",
