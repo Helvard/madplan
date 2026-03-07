@@ -562,9 +562,19 @@ class Database:
     # ========== RECIPES ==========
 
     def save_recipe(self, household_id, data: Dict) -> Dict:
-        """Insert a new recipe and return the created row."""
+        """Insert a new recipe and return the created row (or existing if name matches)."""
+        name = data["name"]
+
+        # Duplicate check: same name (case-insensitive) for this household
+        q = self.db.table("recipes").select("id, name").ilike("name", name)
+        if household_id:
+            q = q.eq("household_id", household_id)
+        existing = q.limit(1).execute().data
+        if existing:
+            return existing[0]
+
         row = {
-            "name": data["name"],
+            "name": name,
             "description": data.get("description", ""),
             "ingredients": data.get("ingredients", []),
             "instructions": data.get("instructions", ""),
