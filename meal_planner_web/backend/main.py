@@ -649,12 +649,12 @@ async def accept_plan(request: Request, session_id: str = Form(...)):
         
         # Simple regex to find "Day X: Meal Name" patterns
         import re
-        day_pattern = re.compile(r'Day (\d+):\s*([^\n]+)')
+        day_pattern = re.compile(r'Day\s+(\d+):\s*([^\n]+)', re.IGNORECASE)
         matches = day_pattern.findall(meal_plan_text)
-        
+
         for day_num, meal_name in matches:
             meals.append({
-                'name': meal_name.strip(),
+                'name': re.sub(r'[*#`]+', '', meal_name).strip(),
                 'day_number': int(day_num)
             })
         
@@ -1882,6 +1882,19 @@ async def add_from_meal_plan_endpoint(
             )
 
         print(f"[add_from_meal_plan] added {len(items)} items to list {active_list['id']}")
+
+        # Also save the meal plan to history
+        import re
+        day_pattern = re.compile(r'Day\s+(\d+):\s*([^\n]+)', re.IGNORECASE)
+        meals = [
+            {'name': re.sub(r'[*#`]+', '', m).strip(), 'day_number': int(d)}
+            for d, m in day_pattern.findall(meal_plan)
+        ]
+        if meals:
+            plan_date = datetime.now().strftime('%Y-%m-%d')
+            db.save_meal_plan(plan_date, meals, household_id=household_id)
+            chat_sessions[session_id]["state"] = "complete"
+            print(f"[add_from_meal_plan] saved {len(meals)} meals to history")
 
         return HTMLResponse(
             f'<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">'
