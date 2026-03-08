@@ -66,7 +66,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 db = Database()
 claude = ClaudeClient()
 
-DEFAULT_BG_PHOTO = "/static/images/bread.jpg"
+DEFAULT_BG_PHOTO = "/static/images/7DD7A92A-8168-46AB-B0E6-DFE47E1A21B8_1_201_a.jpeg"
 
 
 def _get_bg_photo(household_id) -> str:

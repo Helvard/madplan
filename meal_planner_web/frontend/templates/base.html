@@ -19,36 +19,23 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: block; }
         .htmx-request.htmx-indicator { display: block; }
-
-        /* Rotating meal photo background */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: var(--bg-photo, none);
-            background-size: cover;
-            background-position: center;
-            filter: blur(48px);
-            transform: scale(1.05);
-            z-index: -1;
-        }
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: rgba(244, 240, 232, 0.72);
-            z-index: -1;
-        }
     </style>
-
-    {% if background_photo_url %}
-    <style>:root { --bg-photo: url('{{ background_photo_url }}'); }</style>
-    {% endif %}
 
     {% block head %}{% endblock %}
 </head>
 <body>
-    <div class="min-h-screen flex flex-col">
+
+    <!-- Background photo layer (blurred) -->
+    <div aria-hidden="true" style="position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none;">
+        {% if background_photo_url %}
+        <div style="position:absolute;inset:-5%;background-image:url('{{ background_photo_url }}');background-size:cover;background-position:center;filter:blur(48px);"></div>
+        {% endif %}
+        <!-- Warm parchment overlay — always present -->
+        <div style="position:absolute;inset:0;background:rgba(244,240,232,0.72);"></div>
+    </div>
+
+    <!-- Main content — sits above the background -->
+    <div class="min-h-screen flex flex-col" style="position:relative;z-index:1;">
         {% include 'partials/navigation.html' %}
 
         <main class="flex-1">
