@@ -10,7 +10,7 @@
         <p class="text-gray-600 mb-8">Hjælp med at forbedre fremtidige madplaner ved at bedømme hvad du har lavet!</p>
 
         {% if unrated_meals %}
-        <form hx-post="/rate-meals/submit" hx-target="#result-message">
+        <form hx-post="/rate-meals/submit" hx-target="#result-message" hx-encoding="multipart/form-data">
             <div class="space-y-8">
                 {% for meal in unrated_meals %}
                 <div class="border border-gray-200 rounded-lg p-6 bg-gray-50">
@@ -48,6 +48,17 @@
                                 class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
                             <span class="ml-2 text-sm text-gray-700">Det ville jeg lave igen</span>
                         </label>
+                    </div>
+
+                    <!-- Photo upload (optional) -->
+                    <div class="mt-3">
+                        <label class="block text-sm text-gray-500 mb-1">
+                            Tog du et billede? <span class="text-xs text-gray-400">(valgfrit)</span>
+                        </label>
+                        <input type="file" name="photo_{{ loop.index }}" accept="image/*"
+                               onchange="previewPhoto(this)"
+                               class="block text-sm text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer">
+                        <img class="photo-preview mt-2 rounded-lg object-cover max-h-40 w-auto" style="display:none" alt="Forhåndsvisning">
                     </div>
 
                     <!-- Member feedback (optional) -->
@@ -112,6 +123,18 @@
 
 {% block scripts %}
 <script>
+    function previewPhoto(input) {
+        const preview = input.nextElementSibling;
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
     setTimeout(initStarRatings, 100);
 
     function initStarRatings() {

@@ -66,6 +66,22 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 db = Database()
 claude = ClaudeClient()
 
+DEFAULT_BG_PHOTO = "/static/images/bread.jpg"
+
+
+def _get_bg_photo(household_id) -> str:
+    """Return a background photo URL for the household (random from recent meals, or default)."""
+    import random
+    if household_id:
+        try:
+            photos = db.get_household_background_photos(household_id)
+            if photos:
+                return random.choice(photos)
+        except Exception:
+            pass
+    return DEFAULT_BG_PHOTO
+
+
 # Supabase config for auth API calls
 _SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 _SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -665,11 +681,13 @@ async def home(request: Request):
     user = get_current_user(request)
     if not user:
         return login_redirect()
+    household_id = request.session.get("household_id")
     selected_offers = request.session.get('selected_offers', [])
     return templates.TemplateResponse("index.html", {
         "request": request,
         "user": user,
-        "selected_offers": selected_offers
+        "selected_offers": selected_offers,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -796,6 +814,7 @@ async def rate_meals_page(request: Request):
         "user": user,
         "unrated_meals": unrated,
         "members": members,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -836,11 +855,24 @@ async def submit_ratings(request: Request):
         
         if meal_id:
             try:
+                photo_url = None
+                photo_file = form_data.get(f'photo_{i}')
+                if photo_file and hasattr(photo_file, 'read'):
+                    photo_data = await photo_file.read()
+                    if photo_data:
+                        ct = getattr(photo_file, 'content_type', None) or 'image/jpeg'
+                        path = f"households/{household_id}/meals/{meal_id}.jpg"
+                        try:
+                            photo_url = db.upload_photo("meal-photos", path, photo_data, ct)
+                        except Exception as upload_err:
+                            print(f"  ⚠️ Photo upload failed: {upload_err}")
+
                 db.rate_meal(
                     meal_id=int(meal_id),
                     rating=int(rating),
                     comments=comments if comments else None,
-                    would_repeat=would_repeat
+                    would_repeat=would_repeat,
+                    photo_url=photo_url,
                 )
                 rated_count += 1
                 print(f"  ✅ Saved successfully")
@@ -879,6 +911,8 @@ async def submit_ratings(request: Request):
 async def offers_page(request: Request):
     """Show offers browsing page."""
     user = get_current_user(request)
+    household_id = request.session.get("household_id")
+    bg = _get_bg_photo(household_id)
     try:
         offers = load_offers_from_db()
 
@@ -898,7 +932,8 @@ async def offers_page(request: Request):
             "offers": offers,
             "total_offers": total_offers,
             "avg_savings": round(avg_savings, 1),
-            "departments": departments
+            "departments": departments,
+            "background_photo_url": bg,
         })
     except FileNotFoundError:
         return templates.TemplateResponse("offers.html", {
@@ -908,7 +943,8 @@ async def offers_page(request: Request):
             "total_offers": 0,
             "avg_savings": 0,
             "departments": {},
-            "error": "No offers found. Please run the scraper first."
+            "error": "No offers found. Please run the scraper first.",
+            "background_photo_url": bg,
         })
 
 """
@@ -1248,6 +1284,7 @@ async def preferences_page(request: Request):
         "preferences": preferences,
         "members": members,
         "user_member": user_member,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -1330,6 +1367,7 @@ async def my_preferences_page(request: Request):
         "members": db.get_member_preferences(household_id) if household_id else [],
         "user_member": user_member,
         "scroll_to_member": user_member["id"],
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -1516,7 +1554,8 @@ async def view_history(request: Request):
     return templates.TemplateResponse("history.html", {
         "request": request,
         "user": user,
-        "history": history
+        "history": history,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -1695,6 +1734,7 @@ async def shopping_list_page(request: Request):
         "stats": stats,
         "progress_percent": progress_percent,
         "staples": staples,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 @app.get("/shopping-list/count")
@@ -2202,6 +2242,7 @@ async def recipes_page(request: Request):
         "user": user,
         "recipes": recipes,
         "all_tags": all_tags,
+        "background_photo_url": _get_bg_photo(household_id),
     })
 
 
@@ -2275,7 +2316,34 @@ async def recipe_detail(request: Request, recipe_id: int):
         "user": user,
         "recipe": recipe,
         "ingredients_text": _ingredients_to_text(recipe.get("ingredients")),
+        "background_photo_url": _get_bg_photo(household_id),
     })
+
+
+@app.post("/recipes/{recipe_id}/photo", response_class=HTMLResponse)
+async def upload_recipe_photo(request: Request, recipe_id: int):
+    """Upload a photo for a recipe."""
+    user, household_id = _require_auth(request)
+    if not user:
+        return HTMLResponse('<span class="text-red-500 text-sm">Ikke logget ind</span>', status_code=401)
+    form_data = await request.form()
+    photo_file = form_data.get("photo")
+    if not photo_file or not hasattr(photo_file, 'read'):
+        return HTMLResponse('<span class="text-red-500 text-sm">Intet foto valgt</span>')
+    photo_data = await photo_file.read()
+    if not photo_data:
+        return HTMLResponse('<span class="text-red-500 text-sm">Tomt foto</span>')
+    ct = getattr(photo_file, 'content_type', None) or 'image/jpeg'
+    path = f"households/{household_id}/recipes/{recipe_id}.jpg"
+    try:
+        url = db.upload_photo("meal-photos", path, photo_data, ct)
+        db.update_recipe(recipe_id, household_id, {"photo_url": url})
+        return HTMLResponse(
+            f'<img src="{url}" alt="Opskriftsfoto" class="w-full rounded-lg mt-2 object-cover max-h-64">'
+            f'<p class="text-green-700 text-sm mt-1">✓ Foto gemt</p>'
+        )
+    except Exception as e:
+        return HTMLResponse(f'<span class="text-red-500 text-sm">Fejl: {escape(str(e))}</span>')
 
 
 @app.post("/recipes/{recipe_id}/edit", response_class=HTMLResponse)

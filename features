@@ -13,3 +13,9 @@ AI-powered stock management
 ###Family member preferences###
 - In a family each member should have individual preferences
 
+###Add Telegram access###
+- Allow users to interact with the app via Telegram bot
+- Users can send messages to the bot to get recipe suggestions, check stock levels, etc.
+- Users can also upload photos of their fridge, cupboards, etc. to the bot to update stock levels
+- Users can also rate meals and upload photos of their meals to the bot
+- Users can also create recipes from external sources (links, images, etc.) via the bot

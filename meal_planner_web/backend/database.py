@@ -88,14 +88,39 @@ class Database:
             q = q.eq("household_id", household_id)
         return q.execute().data or []
 
-    def rate_meal(self, meal_id: int, rating: int, comments: str = None, would_repeat: bool = True):
+    def rate_meal(self, meal_id: int, rating: int, comments: str = None, would_repeat: bool = True, photo_url: str = None):
         """Rate a meal from history."""
-        self.db.table("meal_history").update({
+        update_data = {
             "rating": rating,
             "comments": comments,
             "would_repeat": would_repeat,
             "date_rated": _now(),
-        }).eq("id", meal_id).execute()
+        }
+        if photo_url:
+            update_data["photo_url"] = photo_url
+        self.db.table("meal_history").update(update_data).eq("id", meal_id).execute()
+
+    def get_household_background_photos(self, household_id, limit: int = 10) -> list:
+        """Return public photo URLs from the household's most recent meal photos."""
+        res = (
+            self.db.table("meal_history")
+            .select("photo_url")
+            .eq("household_id", household_id)
+            .not_.is_("photo_url", "null")
+            .order("plan_date", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return [row["photo_url"] for row in (res.data or []) if row.get("photo_url")]
+
+    def upload_photo(self, bucket: str, path: str, data: bytes, content_type: str = "image/jpeg") -> str:
+        """Upload bytes to Supabase Storage and return the public URL."""
+        self.db.storage.from_(bucket).upload(
+            path=path,
+            file=data,
+            file_options={"content-type": content_type, "upsert": "true"},
+        )
+        return self.db.storage.from_(bucket).get_public_url(path)
 
     def get_meal_history_for_context(self, weeks_back: int = 4, household_id: int = None) -> str:
         """Get meal history formatted for Claude's context."""

@@ -19,11 +19,35 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: block; }
         .htmx-request.htmx-indicator { display: block; }
+
+        /* Rotating meal photo background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: var(--bg-photo, none);
+            background-size: cover;
+            background-position: center;
+            filter: blur(48px);
+            transform: scale(1.05);
+            z-index: -1;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: rgba(244, 240, 232, 0.72);
+            z-index: -1;
+        }
     </style>
+
+    {% if background_photo_url %}
+    <style>:root { --bg-photo: url('{{ background_photo_url }}'); }</style>
+    {% endif %}
 
     {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-50">
+<body>
     <div class="min-h-screen flex flex-col">
         {% include 'partials/navigation.html' %}
 
